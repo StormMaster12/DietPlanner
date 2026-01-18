@@ -1,5 +1,9 @@
 using DietPlanner;
+using DietPlanner.Endpoints.DayPlan;
+using DietPlanner.Endpoints.Meal;
 using DietPlanner.Endpoints.Settings;
+using DietPlanner.Endpoints.Slots;
+using DietPlanner.Endpoints.WeekPlan;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,12 +11,18 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+var services = builder.Services;
+services.AddEndpointsApiExplorer();
+services.AddSwaggerGen();
 
-builder.Services.AddScoped<ISettingsService, SettingsService>();
-builder.Services.AddValidatorsFromAssemblyContaining<Program>();
-builder.Services.AddDbContext<AppDbContext>(opt =>
+services.AddScoped<ISettingsService, SettingsService>()
+    .AddScoped<IDayPlanService, DayPlanService>()
+    .AddScoped<IWeekPlanService, WeekPlanService>()
+    .AddScoped<IMealsService, MealsService>()
+    .AddScoped<ISlotsService, SlotsService>();
+
+services.AddValidatorsFromAssemblyContaining<Program>();
+services.AddDbContext<AppDbContext>(opt =>
     opt.UseSqlite(builder.Configuration.GetConnectionString("Db")));
 
 WebApplication app = builder.Build();
@@ -27,5 +37,9 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.MapSettingsEndpoints();
+app.MapDayEndpoints();
+app.MapMealsEndpoints();
+app.MapSlotsEndpoints();
+app.MapWeekEndpoints();
 
 app.Run();

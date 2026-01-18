@@ -8,11 +8,13 @@ public sealed record WeekPlanEntry(
     Guid Id,
     DateOnly Date,
     SlotKey SlotKey,
-    Slot Slot,
     Guid MealId,
-    MealEntry Meal,
     decimal PortionMultiplier,
-    string? Notes);
+    string? Notes)
+{
+    public MealEntry Meal { get; set; } = null!;
+    public Slot Slot { get; set; } = null!;
+}
 
 public static class ConfigureWeekPlanEntry
 {

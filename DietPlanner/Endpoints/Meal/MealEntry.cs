@@ -1,4 +1,5 @@
 ﻿using DietPlanner.Endpoints.Slots;
+using Microsoft.EntityFrameworkCore;
 
 namespace DietPlanner.Endpoints.Meal;
 
@@ -17,4 +18,22 @@ public sealed class MealEntry
     public string? ZoeNotes { get; set; }
     public required string MfName { get; set; }
     public string? Notes { get; set; }
+}
+
+public static class ConfigureMealEntry
+{
+    public static ModelBuilder ConfigureMealEntryEntity(this ModelBuilder builder)
+    {
+        builder.Entity<MealEntry>(b =>
+        {
+            b.HasKey(x => x.Id);
+            b.HasOne(x => x.Slot)
+                .WithMany()
+                .HasForeignKey(x => x.SlotKey)
+                .OnDelete(DeleteBehavior.Restrict);
+
+        });
+
+        return builder;
+    }
 }

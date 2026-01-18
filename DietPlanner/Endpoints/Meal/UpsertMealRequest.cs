@@ -4,7 +4,7 @@ using FluentValidation;
 namespace DietPlanner.Endpoints.Meal;
 
 public record UpsertMealRequest(
-    MealId MealId,
+    Guid MealId,
     string Name,
     SlotKey SlotKey,
     int Kcal,

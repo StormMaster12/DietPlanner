@@ -22,9 +22,7 @@ public sealed class MealsService : IMealsService
 
     public async Task<MealDto?> GetMealAsync(Guid mealId, CancellationToken cancellationToken)
     {
-        MealEntry? m = await _db.Meals
-    .AsNoTracking()
-    .SingleOrDefaultAsync(x => x.Id == mealId, cancellationToken);
+        var m = await _db.Meals.AsNoTracking().SingleOrDefaultAsync(x => x.Id == mealId, cancellationToken);
 
         return m is null ? null : new MealDto(m.Id, m.Name, m.SlotKey, m.Kcal, m.ProteinG, m.FibreG, m.Plants, m.ZoeNotes, m.MfName, m.Notes);
     }
@@ -71,7 +69,7 @@ public sealed class MealsService : IMealsService
 
         await _db.SaveChangesAsync(cancellationToken);
 
-        MealDto dto = new(existing.MealId, existing.Name, existing.SlotKey, existing.Kcal, existing.ProteinG, existing.FibreG, existing.Plants, existing.ZoeNotes, existing.MfName, existing.Notes);
+        MealDto dto = new(existing.Id, existing.Name, existing.SlotKey, existing.Kcal, existing.ProteinG, existing.FibreG, existing.Plants, existing.ZoeNotes, existing.MfName, existing.Notes);
         return (UpsertMealResult.Success, dto);
     }
 

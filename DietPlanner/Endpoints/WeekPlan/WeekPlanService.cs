@@ -41,7 +41,7 @@ public sealed class WeekPlanService : IWeekPlanService
 
         if (existing is null)
         {
-            existing = new WeekPlanEntry(Guid.NewGuid(), request.Date, request.SlotKey, null!, request.MealId, null!, request.PortionMultiplier, request.Notes);
+            existing = new WeekPlanEntry(Guid.NewGuid(), request.Date, request.SlotKey, request.MealId, request.PortionMultiplier, request.Notes);
             _db.WeekPlanEntries.Add(existing);
         }
         else
@@ -83,7 +83,7 @@ public sealed class WeekPlanService : IWeekPlanService
 
             if (existing is null)
             {
-                _db.WeekPlanEntries.Add(new WeekPlanEntry(Guid.NewGuid(), e.Date, e.SlotKey, null!, e.MealId, null!, e.PortionMultiplier, e.Notes));
+                _db.WeekPlanEntries.Add(new WeekPlanEntry(Guid.NewGuid(), e.Date, e.SlotKey, e.MealId, e.PortionMultiplier, e.Notes));
             }
             else
             {
