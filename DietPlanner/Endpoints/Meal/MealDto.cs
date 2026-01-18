@@ -1,16 +1,15 @@
 ﻿using DietPlanner.Endpoints.Slots;
 
-namespace DietPlanner.Endpoints.Meal
-{
-    public sealed record MealDto(
-    MealId MealId,
-    string Name,
-    SlotKey SlotKey,
-    int Kcal,
-    int ProteinG,
-    int FibreG,
-    int Plants,
-    string? ZoeNotes,
-    string MfName,
-    string? Notes);
-}
+namespace DietPlanner.Endpoints.Meal;
+
+public sealed record MealDto(
+MealId MealId,
+string Name,
+SlotKey SlotKey,
+int Kcal,
+int ProteinG,
+int FibreG,
+int Plants,
+string? ZoeNotes,
+string MfName,
+string? Notes);

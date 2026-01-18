@@ -1,39 +1,8 @@
 ﻿using DietPlanner.Endpoints.Meal;
 using DietPlanner.Endpoints.Settings;
-using DietPlanner.Endpoints.Slots;
 using Microsoft.EntityFrameworkCore;
 
-namespace DietPlanner.Endpoints.Day;
-
-public sealed record DayPlanMealDto(
-    DateOnly Date,
-    SlotKey SlotKey,
-    int SlotOrder,
-    MealId MealId,
-    string Name,
-    string MfName,
-    decimal PortionMultiplier,
-    int Kcal,
-    int ProteinG,
-    int FibreG,
-    int Plants,
-    string? ZoeNotes,
-    string? Notes);
-
-public sealed record DayPlanTotalsDto(int Kcal, int ProteinG, int FibreG, int Plants);
-
-public sealed record DayPlanResponseDto(
-    DateOnly Date,
-    IReadOnlyList<DayPlanMealDto> Meals,
-    DayPlanTotalsDto Totals,
-    Settings.SettingsDto Targets,
-    DayPlanTotalsDto Remaining);
-
-
-public interface IDayPlanService
-{
-    Task<DayPlanResponseDto> GetDayPlanAsync(DateOnly date, CancellationToken cancellationToken);
-}
+namespace DietPlanner.Endpoints.DayPlan;
 
 public sealed class DayPlanService : IDayPlanService
 {
@@ -50,15 +19,11 @@ public sealed class DayPlanService : IDayPlanService
     {
         SettingsDto targets = await _settings.GetAsync(cancellationToken);
 
-        Dictionary<SlotKey, int> slots = await _db.Slots
-            .AsNoTracking()
-            .OrderBy(s => s.SortOrder)
-            .ToDictionaryAsync(s => s.Key, s => s.SortOrder, cancellationToken);
-
         List<WeekPlan.WeekPlanEntry> planned = await _db.WeekPlanEntries
             .AsNoTracking()
             .Where(x => x.Date == date)
             .Include(x => x.Meal)
+            .Include(x => x.Slot)
             .ToListAsync(cancellationToken);
 
         static int Scale(int v, decimal mult)
@@ -70,13 +35,12 @@ public sealed class DayPlanService : IDayPlanService
             .Select(p =>
             {
                 decimal mult = p.PortionMultiplier;
-                int slotOrder = slots.TryGetValue(p.SlotKey, out int so) ? so : 999;
                 MealEntry m = p.Meal;
 
                 return new DayPlanMealDto(
                     date,
                     p.SlotKey,
-                    slotOrder,
+                    p.Slot.SortOrder,
                     p.MealId,
                     m.Name,
                     m.MfName,

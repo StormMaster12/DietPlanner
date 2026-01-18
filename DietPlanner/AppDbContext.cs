@@ -5,6 +5,7 @@ using DietPlanner.Endpoints.WeekPlan;
 using Microsoft.EntityFrameworkCore;
 
 namespace DietPlanner;
+
 public sealed class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
