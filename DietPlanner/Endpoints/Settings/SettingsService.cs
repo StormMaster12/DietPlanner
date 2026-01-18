@@ -11,11 +11,14 @@ public sealed class SettingsService : ISettingsService
     private const int DefaultFibre = 30;
     private const int DefaultPlants = 30;
 
-    public SettingsService(AppDbContext db) => _db = db;
+    public SettingsService(AppDbContext db)
+    {
+        _db = db;
+    }
 
     public async Task<SettingsDto> GetAsync(CancellationToken ct)
     {
-        var map = await _db.Settings
+        Dictionary<string, string> map = await _db.Settings
             .AsNoTracking()
             .ToDictionaryAsync(s => s.Key, s => s.Value, ct);
 
@@ -34,7 +37,7 @@ public sealed class SettingsService : ISettingsService
         await UpsertKeyAsync("daily_fibre_target_g", req.DailyFibreTargetG.ToString(), ct);
         await UpsertKeyAsync("daily_plants_target", req.DailyPlantsTarget.ToString(), ct);
 
-        await _db.SaveChangesAsync(ct);
+        _ = await _db.SaveChangesAsync(ct);
 
         return new SettingsDto(
             req.DailyKcalTarget,
@@ -45,14 +48,16 @@ public sealed class SettingsService : ISettingsService
     }
 
     private static int GetInt(Dictionary<string, string> map, string key, int fallback)
-        => map.TryGetValue(key, out var v) && int.TryParse(v, out var n) ? n : fallback;
+    {
+        return map.TryGetValue(key, out string? v) && int.TryParse(v, out int n) ? n : fallback;
+    }
 
     private async Task UpsertKeyAsync(string key, string value, CancellationToken ct)
     {
-        var row = await _db.Settings.SingleOrDefaultAsync(s => s.Key == key, ct);
+        Settings? row = await _db.Settings.SingleOrDefaultAsync(s => s.Key == key, ct);
         if (row is null)
         {
-            _db.Settings.Add(new Settings(key, value));
+            _ = _db.Settings.Add(new Settings(key, value));
         }
         else
         {

@@ -8,27 +8,29 @@ public static class SettingsEndpoints
 {
     public static IEndpointRouteBuilder MapSettingsEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/settings")
+        RouteGroupBuilder group = endpoints.MapGroup("/settings")
             .WithTags("Settings");
 
-        group.MapGet("/", GetSettings).WithOpenApi();
-        group.MapPut("/", PutSettings).WithOpenApi();
+        _ = group.MapGet("/", GetSettings).WithOpenApi();
+        _ = group.MapPut("/", PutSettings).WithOpenApi();
 
         return endpoints;
     }
 
     public static Task<SettingsDto> GetSettings([FromServices] ISettingsService svc, CancellationToken ct)
-        => svc.GetAsync(ct);
+    {
+        return svc.GetAsync(ct);
+    }
 
     public static async Task<Results<ValidationProblem, Ok<SettingsDto>>> PutSettings([FromBody] UpdateSettingsRequest req, [FromServices] ISettingsService svc, [FromServices] IValidator<UpdateSettingsRequest> validator, CancellationToken ct)
     {
-        var valid = await validator.ValidateAsync(req, ct);
+        FluentValidation.Results.ValidationResult valid = await validator.ValidateAsync(req, ct);
         if (!valid.IsValid)
         {
             return TypedResults.ValidationProblem(valid.ToDictionary());
         }
 
-        var updated = await svc.UpdateAsync(req, ct);
+        SettingsDto updated = await svc.UpdateAsync(req, ct);
         return TypedResults.Ok(updated);
     }
 }

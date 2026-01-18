@@ -8,7 +8,7 @@ public static class ConfigureSettings
 {
     public static ModelBuilder AddSettings(this ModelBuilder b)
     {
-        b.Entity<Settings>()
+        _ = b.Entity<Settings>()
               .HasKey(s => s.Key);
         return b;
     }
