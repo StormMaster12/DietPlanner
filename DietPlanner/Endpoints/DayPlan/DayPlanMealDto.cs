@@ -1,5 +1,4 @@
-﻿using DietPlanner.Endpoints.Meal;
-using DietPlanner.Endpoints.Slots;
+﻿using DietPlanner.Endpoints.Slots;
 
 namespace DietPlanner.Endpoints.DayPlan;
 
@@ -7,7 +6,7 @@ public sealed record DayPlanMealDto(
     DateOnly Date,
     SlotKey SlotKey,
     int SlotOrder,
-    MealId MealId,
+    Guid MealId,
     string Name,
     string MfName,
     decimal PortionMultiplier,

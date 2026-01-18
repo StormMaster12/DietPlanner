@@ -5,11 +5,11 @@ using Microsoft.EntityFrameworkCore;
 namespace DietPlanner.Endpoints.WeekPlan;
 
 public sealed record WeekPlanEntry(
-    int Id,
+    Guid Id,
     DateOnly Date,
     SlotKey SlotKey,
     Slot Slot,
-    MealId MealId,
+    Guid MealId,
     MealEntry Meal,
     decimal PortionMultiplier,
     string? Notes);
@@ -39,4 +39,3 @@ public static class ConfigureWeekPlanEntry
         return b;
     }
 }
-

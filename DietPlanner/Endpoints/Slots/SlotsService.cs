@@ -21,8 +21,8 @@ public class SlotsService : ISlotsService
 
         Slot slot = new(request.Key, request.DisplayName.Trim(), request.SortOrder);
 
-        _ = _appDbContext.Slots.Add(slot);
-        _ = await _appDbContext.SaveChangesAsync();
+        _appDbContext.Slots.Add(slot);
+        await _appDbContext.SaveChangesAsync();
 
         return new SlotDto(slot.DisplayName, slot.SortOrder, slot.Key);
     }
@@ -35,8 +35,8 @@ public class SlotsService : ISlotsService
             return DeleteResult.NotFound;
         }
 
-        _ = _appDbContext.Slots.Remove(slot);
-        _ = await _appDbContext.SaveChangesAsync();
+        _appDbContext.Slots.Remove(slot);
+        await _appDbContext.SaveChangesAsync();
         return DeleteResult.Success;
     }
 

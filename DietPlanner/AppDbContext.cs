@@ -17,11 +17,13 @@ public sealed class AppDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder b)
     {
-        _ = b.Entity<Slot>().HasIndex(x => x.Key).IsUnique();
-        _ = b.Entity<MealEntry>().HasIndex(x => x.MealId).IsUnique();
-
-
-        _ = b.AddWeekPlanEntry();
-        _ = b.AddSettings();
+        b.Entity<Slot>().HasIndex(x => x.Key).IsUnique();
+        b.Entity<MealEntry>().HasIndex(x => x.Id).IsUnique();
+        b.Entity<MealEntry>().HasOne(x => x.Slot)
+            .WithMany()
+            .HasForeignKey(x => x.SlotKey)
+            .OnDelete(DeleteBehavior.Restrict);
+        b.AddWeekPlanEntry();
+        b.AddSettings();
     }
 }

@@ -37,7 +37,7 @@ public sealed class SettingsService : ISettingsService
         await UpsertKeyAsync("daily_fibre_target_g", req.DailyFibreTargetG.ToString(), ct);
         await UpsertKeyAsync("daily_plants_target", req.DailyPlantsTarget.ToString(), ct);
 
-        _ = await _db.SaveChangesAsync(ct);
+        await _db.SaveChangesAsync(ct);
 
         return new SettingsDto(
             req.DailyKcalTarget,
@@ -57,7 +57,7 @@ public sealed class SettingsService : ISettingsService
         Settings? row = await _db.Settings.SingleOrDefaultAsync(s => s.Key == key, ct);
         if (row is null)
         {
-            _ = _db.Settings.Add(new Settings(key, value));
+            _db.Settings.Add(new Settings(key, value));
         }
         else
         {

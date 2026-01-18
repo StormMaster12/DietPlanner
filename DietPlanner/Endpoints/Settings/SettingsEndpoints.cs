@@ -11,8 +11,8 @@ public static class SettingsEndpoints
         RouteGroupBuilder group = endpoints.MapGroup("/settings")
             .WithTags("Settings");
 
-        _ = group.MapGet("/", GetSettings).WithOpenApi();
-        _ = group.MapPut("/", PutSettings).WithOpenApi();
+        group.MapGet("/", GetSettings).WithOpenApi();
+        group.MapPut("/", PutSettings).WithOpenApi();
 
         return endpoints;
     }

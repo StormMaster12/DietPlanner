@@ -11,12 +11,12 @@ public record CreateSlotRequest(
     {
         public CreateSlotRequestValidator()
         {
-            _ = RuleFor(x => x.Key)
+            RuleFor(x => x.Key)
                 .NotEmpty().WithMessage("Key is required");
-            _ = RuleFor(x => x.DisplayName)
+            RuleFor(x => x.DisplayName)
                 .NotEmpty().WithMessage("DisplayName is required")
                 .MaximumLength(100).WithMessage("DisplayName must be at most 100 characters long");
-            _ = RuleFor(x => x.SortOrder)
+            RuleFor(x => x.SortOrder)
                 .GreaterThanOrEqualTo(0).WithMessage("SortOrder must be non-negative");
         }
     };

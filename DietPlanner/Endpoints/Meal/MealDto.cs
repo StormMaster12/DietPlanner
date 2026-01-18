@@ -3,7 +3,7 @@
 namespace DietPlanner.Endpoints.Meal;
 
 public sealed record MealDto(
-MealId MealId,
+Guid MealId,
 string Name,
 SlotKey SlotKey,
 int Kcal,

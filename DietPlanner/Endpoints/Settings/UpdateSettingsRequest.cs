@@ -13,10 +13,10 @@ public record UpdateSettingsRequest(
     {
         public UpdateSettingsRequestValidator()
         {
-            _ = RuleFor(x => x.DailyKcalTarget).InclusiveBetween(1200, 5000);
-            _ = RuleFor(x => x.DailyProteinTargetG).InclusiveBetween(50, 350);
-            _ = RuleFor(x => x.DailyFibreTargetG).InclusiveBetween(10, 80);
-            _ = RuleFor(x => x.DailyPlantsTarget).InclusiveBetween(5, 80);
+            RuleFor(x => x.DailyKcalTarget).InclusiveBetween(1200, 5000);
+            RuleFor(x => x.DailyProteinTargetG).InclusiveBetween(50, 350);
+            RuleFor(x => x.DailyFibreTargetG).InclusiveBetween(10, 80);
+            RuleFor(x => x.DailyPlantsTarget).InclusiveBetween(5, 80);
         }
     }
 }

@@ -4,10 +4,10 @@ namespace DietPlanner.Endpoints.Meal;
 
 public sealed class MealEntry
 {
-    public int Id { get; set; }
-    public required MealId MealId { get; set; }
+    public Guid Id { get; set; }
     public required string Name { get; set; }
     public SlotKey SlotKey { get; set; }
+    public Slot Slot { get; set; } = null!;
 
     public int Kcal { get; set; }
     public int ProteinG { get; set; }

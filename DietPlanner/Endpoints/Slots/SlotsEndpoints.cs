@@ -10,9 +10,9 @@ public static class SlotsEndpoints
         RouteGroupBuilder group = endpoints.MapGroup("/slots")
             .WithTags("Slots");
 
-        _ = group.MapGet("/", GetSlotsAsync).WithOpenApi();
-        _ = group.MapPost("/", CreateSlotAsync).WithOpenApi();
-        _ = group.MapDelete("/{key}", DeleteSlotsAsync).WithOpenApi();
+        group.MapGet("/", GetSlotsAsync).WithOpenApi();
+        group.MapPost("/", CreateSlotAsync).WithOpenApi();
+        group.MapDelete("/{key}", DeleteSlotsAsync).WithOpenApi();
 
         return endpoints;
     }
