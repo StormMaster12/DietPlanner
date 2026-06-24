@@ -39,6 +39,19 @@
   --form-row-max-width: 24rem;
 }
 
+[data-theme=dark] {
+  --color-text: #e4e7eb;
+  --color-bg-page: #0f172a;
+  --color-bg-surface: #1b2536;
+  --color-border: #3a4a60;
+  --color-border-subtle: #283548;
+  --color-success-bg: #16321f;
+  --color-success-border: #1f7a3d;
+  --color-error-bg: #3a1f1f;
+  --color-error-border: #7a2f27;
+  --color-table-head-bg: #202d40;
+}
+
 html,
 body {
   margin: 0;

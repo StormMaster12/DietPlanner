@@ -3,10 +3,12 @@
     min-height: 100vh;
 
     &__sidebar {
+        display: flex;
+        flex-direction: column;
         width: var(--sidebar-width);
         flex-shrink: 0;
         background-color: var(--color-sidebar-bg);
-        color: var(--color-bg-surface);
+        color: var(--color-sidebar-text-active);
     }
 
     &__main {
