@@ -6,3 +6,30 @@
     <NavLink href="meals/upload" class="nav__link" ActiveClass="nav__link--active">Upload Meals</NavLink>
     <NavLink href="settings" class="nav__link" ActiveClass="nav__link--active">Settings</NavLink>
 </nav>
+
+<button type="button" class="nav__theme-toggle" @onclick="ToggleThemeAsync">
+    @(IsDarkMode ? "☀️ Light mode" : "🌙 Dark mode")
+</button>
+
+@code {
+    private bool IsDarkMode { get; set; }
+
+    [Inject]
+    private IJSRuntime JsRuntime { get; set; } = null!;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            string currentTheme = await JsRuntime.InvokeAsync<string>("themeManager.get");
+            IsDarkMode = currentTheme == "dark";
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleThemeAsync()
+    {
+        IsDarkMode = !IsDarkMode;
+        await JsRuntime.InvokeVoidAsync("themeManager.set", IsDarkMode ? "dark" : "light");
+    }
+}
