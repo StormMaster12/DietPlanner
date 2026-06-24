@@ -1,0 +1,278 @@
+@page "/meals"
+
+<h1>Meals</h1>
+
+<p>All meals currently in the database, grouped by slot. Use this page to add, edit, or delete individual meals one at a time - to bulk-load many meals at once, use the <a href="meals/upload">Upload Meals</a> page instead.</p>
+
+<button class="btn btn-primary" @onclick="StartAddingNewMeal">Add a new meal</button>
+
+@if (ErrorMessage is not null)
+{
+    <div class="alert alert-error">@ErrorMessage</div>
+}
+
+@if (IsFormVisible)
+{
+    <section class="meal-form">
+        <h2>@(IsEditingExistingMeal ? "Edit meal" : "Add meal")</h2>
+
+        <EditForm Model="FormModel" OnSubmit="SaveMealAsync" class="edit-form">
+            <div class="form-row">
+                <label for="meal-name">Name</label>
+                <InputText id="meal-name" @bind-Value="FormModel.Name" />
+            </div>
+
+            <div class="form-row">
+                <label for="meal-slot">Slot</label>
+                <InputSelect id="meal-slot" @bind-Value="FormModel.SlotKey">
+                    @foreach (SlotDto slot in Slots ?? Enumerable.Empty<SlotDto>())
+                    {
+                        <option value="@slot.Key">@slot.DisplayName</option>
+                    }
+                </InputSelect>
+            </div>
+
+            <div class="form-row">
+                <label for="meal-kcal">Kcal</label>
+                <InputNumber id="meal-kcal" @bind-Value="FormModel.Kcal" />
+            </div>
+
+            <div class="form-row">
+                <label for="meal-protein">Protein (g)</label>
+                <InputNumber id="meal-protein" @bind-Value="FormModel.ProteinG" />
+            </div>
+
+            <div class="form-row">
+                <label for="meal-carbs">Carbs (g)</label>
+                <InputNumber id="meal-carbs" @bind-Value="FormModel.CarbsG" />
+            </div>
+
+            <div class="form-row">
+                <label for="meal-fibre">Fibre (g)</label>
+                <InputNumber id="meal-fibre" @bind-Value="FormModel.FibreG" />
+            </div>
+
+            <div class="form-row">
+                <label for="meal-plants">Plant points</label>
+                <InputNumber id="meal-plants" @bind-Value="FormModel.Plants" />
+            </div>
+
+            <div class="form-row">
+                <label for="meal-mfname">MyFitnessPal name</label>
+                <InputText id="meal-mfname" @bind-Value="FormModel.MfName" />
+            </div>
+
+            <div class="form-row">
+                <label for="meal-zoe-notes">Zoe notes</label>
+                <InputTextArea id="meal-zoe-notes" @bind-Value="FormModel.ZoeNotes" />
+            </div>
+
+            <div class="form-row">
+                <label for="meal-notes">Notes</label>
+                <InputTextArea id="meal-notes" @bind-Value="FormModel.Notes" />
+            </div>
+
+            @if (FormValidationErrors.Count > 0)
+            {
+                <ul class="validation-message">
+                    @foreach (string validationError in FormValidationErrors)
+                    {
+                        <li>@validationError</li>
+                    }
+                </ul>
+            }
+
+            <button type="submit" class="btn btn-primary">Save meal</button>
+            <button type="button" class="btn btn-secondary" @onclick="CancelEditing">Cancel</button>
+        </EditForm>
+    </section>
+}
+
+@if (Meals is null)
+{
+    <p>Loading meals...</p>
+}
+else if (Meals.Count == 0)
+{
+    <p>No meals have been added yet.</p>
+}
+else
+{
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Slot</th>
+                <th>Name</th>
+                <th>MyFitnessPal name</th>
+                <th class="numeric">Kcal</th>
+                <th class="numeric">Protein (g)</th>
+                <th class="numeric">Carbs (g)</th>
+                <th class="numeric">Fibre (g)</th>
+                <th class="numeric">Plants</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (MealDto meal in Meals.OrderBy(m => m.SlotKey).ThenBy(m => m.Name))
+            {
+                <tr>
+                    <td>@meal.SlotKey</td>
+                    <td>@meal.Name</td>
+                    <td>@meal.MfName</td>
+                    <td class="numeric">@meal.Kcal</td>
+                    <td class="numeric">@meal.ProteinG</td>
+                    <td class="numeric">@meal.CarbsG</td>
+                    <td class="numeric">@meal.FibreG</td>
+                    <td class="numeric">@meal.Plants</td>
+                    <td>
+                        <button class="btn btn-secondary" @onclick="() => StartEditingMeal(meal)">Edit</button>
+                        <button class="btn btn-danger" @onclick="() => DeleteMealAsync(meal.MealId)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<style>
+    .meal-form {
+        background-color: #ffffff;
+        border: 1px solid #e4e7eb;
+        border-radius: 0.4rem;
+        padding: 1rem 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+</style>
+
+@code {
+    private List<MealDto>? Meals { get; set; }
+    private List<SlotDto>? Slots { get; set; }
+    private MealFormModel FormModel { get; set; } = new();
+    private bool IsFormVisible { get; set; }
+    private bool IsEditingExistingMeal { get; set; }
+    private string? ErrorMessage { get; set; }
+    private List<string> FormValidationErrors { get; set; } = new();
+
+    [Inject]
+    private IMealsService MealsService { get; set; } = null!;
+
+    [Inject]
+    private ISlotsService SlotsService { get; set; } = null!;
+
+    [Inject]
+    private FluentValidation.IValidator<UpsertMealRequest> MealValidator { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Slots = (await SlotsService.GetSlotsAsync(CancellationToken.None)).OrderBy(s => s.SortOrder).ToList();
+        await ReloadMealsAsync();
+    }
+
+    private async Task ReloadMealsAsync()
+    {
+        Meals = (await MealsService.GetMealsAsync(CancellationToken.None)).ToList();
+    }
+
+    private void StartAddingNewMeal()
+    {
+        FormModel = new MealFormModel { MealId = Guid.NewGuid(), SlotKey = Slots?.FirstOrDefault()?.Key ?? SlotKey.Breakfast };
+        IsEditingExistingMeal = false;
+        IsFormVisible = true;
+        FormValidationErrors.Clear();
+        ErrorMessage = null;
+    }
+
+    private void StartEditingMeal(MealDto meal)
+    {
+        FormModel = new MealFormModel
+        {
+            MealId = meal.MealId,
+            Name = meal.Name,
+            SlotKey = meal.SlotKey,
+            Kcal = meal.Kcal,
+            ProteinG = meal.ProteinG,
+            CarbsG = meal.CarbsG,
+            FibreG = meal.FibreG,
+            Plants = meal.Plants,
+            MfName = meal.MfName,
+            ZoeNotes = meal.ZoeNotes,
+            Notes = meal.Notes
+        };
+        IsEditingExistingMeal = true;
+        IsFormVisible = true;
+        FormValidationErrors.Clear();
+        ErrorMessage = null;
+    }
+
+    private void CancelEditing()
+    {
+        IsFormVisible = false;
+        FormValidationErrors.Clear();
+    }
+
+    private async Task SaveMealAsync()
+    {
+        UpsertMealRequest request = new(
+            FormModel.MealId,
+            FormModel.Name,
+            FormModel.SlotKey,
+            FormModel.Kcal,
+            FormModel.ProteinG,
+            FormModel.CarbsG,
+            FormModel.FibreG,
+            FormModel.Plants,
+            FormModel.ZoeNotes,
+            FormModel.MfName,
+            FormModel.Notes);
+
+        FluentValidation.Results.ValidationResult validationResult = await MealValidator.ValidateAsync(request);
+        if (!validationResult.IsValid)
+        {
+            FormValidationErrors = validationResult.Errors.Select(e => e.ErrorMessage).ToList();
+            return;
+        }
+
+        var (result, _) = await MealsService.UpsertMealAsync(request, CancellationToken.None);
+        if (result == UpsertMealResult.InvalidSlot)
+        {
+            FormValidationErrors = new List<string> { "The selected slot no longer exists." };
+            return;
+        }
+
+        IsFormVisible = false;
+        FormValidationErrors.Clear();
+        await ReloadMealsAsync();
+    }
+
+    private async Task DeleteMealAsync(Guid mealId)
+    {
+        ErrorMessage = null;
+        DeleteResult result = await MealsService.DeleteMealAsync(mealId, CancellationToken.None);
+        if (result == DeleteResult.NotFound)
+        {
+            ErrorMessage = "That meal has already been removed.";
+        }
+
+        await ReloadMealsAsync();
+    }
+
+    /// <summary>
+    /// Mutable stand-in for <see cref="UpsertMealRequest"/> so its fields can be two-way bound by
+    /// Blazor's &lt;InputText&gt;/&lt;InputNumber&gt; components, which need settable properties
+    /// rather than the init-only properties a record's primary constructor produces.
+    /// </summary>
+    private sealed class MealFormModel
+    {
+        public Guid MealId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public SlotKey SlotKey { get; set; }
+        public int Kcal { get; set; }
+        public int ProteinG { get; set; }
+        public int CarbsG { get; set; }
+        public int FibreG { get; set; }
+        public int Plants { get; set; }
+        public string MfName { get; set; } = string.Empty;
+        public string? ZoeNotes { get; set; }
+        public string? Notes { get; set; }
+    }
+}

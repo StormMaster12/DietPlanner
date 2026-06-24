@@ -1,0 +1,123 @@
+html, body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1f2933;
+}
+
+h1, h2, h3 {
+    margin-top: 0;
+}
+
+table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+table.data-table th,
+table.data-table td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #e4e7eb;
+    text-align: left;
+    vertical-align: top;
+}
+
+table.data-table th {
+    background-color: #eef2f7;
+    font-weight: 600;
+}
+
+table.data-table td.numeric,
+table.data-table th.numeric {
+    text-align: right;
+}
+
+td.over-target {
+    color: #c0392b;
+    font-weight: 700;
+}
+
+td.under-target {
+    color: #1e8449;
+}
+
+.btn {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border-radius: 0.3rem;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.btn-primary {
+    background-color: #2563eb;
+    color: #ffffff;
+}
+
+.btn-primary:hover {
+    background-color: #1d4ed8;
+}
+
+.btn-danger {
+    background-color: #dc2626;
+    color: #ffffff;
+}
+
+.btn-danger:hover {
+    background-color: #b91c1c;
+}
+
+.btn-secondary {
+    background-color: #ffffff;
+    color: #1f2933;
+    border-color: #cbd2d9;
+}
+
+.btn-secondary:hover {
+    background-color: #f5f7fa;
+}
+
+form.edit-form .form-row {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0.75rem;
+    max-width: 24rem;
+}
+
+form.edit-form label {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+form.edit-form input,
+form.edit-form select,
+form.edit-form textarea {
+    padding: 0.4rem 0.5rem;
+    border: 1px solid #cbd2d9;
+    border-radius: 0.25rem;
+}
+
+.validation-message {
+    color: #c0392b;
+    font-size: 0.85rem;
+}
+
+.alert {
+    padding: 0.75rem 1rem;
+    border-radius: 0.3rem;
+    margin-bottom: 1rem;
+}
+
+.alert-success {
+    background-color: #e3f7e9;
+    color: #1e8449;
+    border: 1px solid #b6e6c4;
+}
+
+.alert-error {
+    background-color: #fdecea;
+    color: #c0392b;
+    border: 1px solid #f6c1bb;
+}

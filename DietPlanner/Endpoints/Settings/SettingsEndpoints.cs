@@ -8,7 +8,7 @@ public static class SettingsEndpoints
 {
     public static IEndpointRouteBuilder MapSettingsEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        RouteGroupBuilder group = endpoints.MapGroup("/settings")
+        RouteGroupBuilder group = endpoints.MapGroup("/api/settings")
             .WithTags("Settings");
 
         group.MapGet("/", GetSettings).WithOpenApi();

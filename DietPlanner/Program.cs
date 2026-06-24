@@ -1,4 +1,5 @@
 using DietPlanner;
+using DietPlanner.Components;
 using DietPlanner.Endpoints.DayPlan;
 using DietPlanner.Endpoints.Meal;
 using DietPlanner.Endpoints.Settings;
@@ -15,10 +16,18 @@ var services = builder.Services;
 services.AddEndpointsApiExplorer();
 services.AddSwaggerGen();
 
+// Razor Components power the interactive Diet Planner / Meals / Settings web pages, rendered
+// server-side (Blazor Server) so the UI can call straight into the same EF Core services that
+// back the minimal API below, without needing a separate JavaScript HTTP client layer.
+services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+
 services.AddScoped<ISettingsService, SettingsService>()
     .AddScoped<IDayPlanService, DayPlanService>()
     .AddScoped<IWeekPlanService, WeekPlanService>()
+    .AddScoped<IWeekPlanGeneratorService, WeekPlanGeneratorService>()
     .AddScoped<IMealsService, MealsService>()
+    .AddScoped<IMealImportService, MealImportService>()
     .AddScoped<ISlotsService, SlotsService>();
 
 services.AddValidatorsFromAssemblyContaining<Program>();
@@ -35,11 +44,16 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
+app.UseAntiforgery();
 
 app.MapSettingsEndpoints();
 app.MapDayEndpoints();
 app.MapMealsEndpoints();
 app.MapSlotsEndpoints();
 app.MapWeekEndpoints();
+
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
 
 app.Run();

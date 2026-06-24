@@ -9,7 +9,7 @@ public static class MealsEndpoints
 {
     public static IEndpointRouteBuilder MapMealsEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        RouteGroupBuilder group = endpoints.MapGroup("/meals")
+        RouteGroupBuilder group = endpoints.MapGroup("/api/meals")
             .WithTags("Meals");
 
         group.MapGet("/", GetMealsAsync).WithOpenApi();

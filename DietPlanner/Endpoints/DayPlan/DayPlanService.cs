@@ -47,6 +47,7 @@ public sealed class DayPlanService : IDayPlanService
                     mult,
                     Scale(m.Kcal, mult),
                     Scale(m.ProteinG, mult),
+                    Scale(m.CarbsG, mult),
                     Scale(m.FibreG, mult),
                     Scale(m.Plants, mult),
                     m.ZoeNotes,
@@ -59,12 +60,14 @@ public sealed class DayPlanService : IDayPlanService
         DayPlanTotalsDto totals = new(
             items.Sum(i => i.Kcal),
             items.Sum(i => i.ProteinG),
+            items.Sum(i => i.CarbsG),
             items.Sum(i => i.FibreG),
             items.Sum(i => i.Plants));
 
         DayPlanTotalsDto remaining = new(
             targets.DailyKcalTarget - totals.Kcal,
             targets.DailyProteinTargetG - totals.ProteinG,
+            targets.DailyCarbTargetG - totals.CarbsG,
             targets.DailyFibreTargetG - totals.FibreG,
             targets.DailyPlantsTarget - totals.Plants);
 

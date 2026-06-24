@@ -16,7 +16,7 @@ public sealed class MealsService : IMealsService
     {
         return await _db.Meals
             .AsNoTracking()
-            .Select(m => new MealDto(m.Id, m.Name, m.SlotKey, m.Kcal, m.ProteinG, m.FibreG, m.Plants, m.ZoeNotes, m.MfName, m.Notes))
+            .Select(m => new MealDto(m.Id, m.Name, m.SlotKey, m.Kcal, m.ProteinG, m.CarbsG, m.FibreG, m.Plants, m.ZoeNotes, m.MfName, m.Notes))
             .ToListAsync(cancellationToken);
     }
 
@@ -24,7 +24,7 @@ public sealed class MealsService : IMealsService
     {
         var m = await _db.Meals.AsNoTracking().SingleOrDefaultAsync(x => x.Id == mealId, cancellationToken);
 
-        return m is null ? null : new MealDto(m.Id, m.Name, m.SlotKey, m.Kcal, m.ProteinG, m.FibreG, m.Plants, m.ZoeNotes, m.MfName, m.Notes);
+        return m is null ? null : new MealDto(m.Id, m.Name, m.SlotKey, m.Kcal, m.ProteinG, m.CarbsG, m.FibreG, m.Plants, m.ZoeNotes, m.MfName, m.Notes);
     }
 
     public async Task<(UpsertMealResult Result, MealDto? Meal)> UpsertMealAsync(UpsertMealRequest request, CancellationToken cancellationToken)
@@ -46,6 +46,7 @@ public sealed class MealsService : IMealsService
                 SlotKey = request.SlotKey,
                 Kcal = request.Kcal,
                 ProteinG = request.ProteinG,
+                CarbsG = request.CarbsG,
                 FibreG = request.FibreG,
                 Plants = request.Plants,
                 ZoeNotes = request.ZoeNotes,
@@ -60,6 +61,7 @@ public sealed class MealsService : IMealsService
             existing.SlotKey = request.SlotKey;
             existing.Kcal = request.Kcal;
             existing.ProteinG = request.ProteinG;
+            existing.CarbsG = request.CarbsG;
             existing.FibreG = request.FibreG;
             existing.Plants = request.Plants;
             existing.ZoeNotes = request.ZoeNotes;
@@ -69,7 +71,7 @@ public sealed class MealsService : IMealsService
 
         await _db.SaveChangesAsync(cancellationToken);
 
-        MealDto dto = new(existing.Id, existing.Name, existing.SlotKey, existing.Kcal, existing.ProteinG, existing.FibreG, existing.Plants, existing.ZoeNotes, existing.MfName, existing.Notes);
+        MealDto dto = new(existing.Id, existing.Name, existing.SlotKey, existing.Kcal, existing.ProteinG, existing.CarbsG, existing.FibreG, existing.Plants, existing.ZoeNotes, existing.MfName, existing.Notes);
         return (UpsertMealResult.Success, dto);
     }
 

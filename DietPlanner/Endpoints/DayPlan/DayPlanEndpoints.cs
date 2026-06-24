@@ -7,7 +7,7 @@ public static class DayPlanEndpoints
 {
     public static IEndpointRouteBuilder MapDayEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        RouteGroupBuilder group = endpoints.MapGroup("/day")
+        RouteGroupBuilder group = endpoints.MapGroup("/api/day")
             .WithTags("DayPlan");
 
         group.MapGet("/{date}", GetDayAsync).WithOpenApi();

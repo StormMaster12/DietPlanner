@@ -12,6 +12,7 @@ public sealed record DayPlanMealDto(
     decimal PortionMultiplier,
     int Kcal,
     int ProteinG,
+    int CarbsG,
     int FibreG,
     int Plants,
     string? ZoeNotes,

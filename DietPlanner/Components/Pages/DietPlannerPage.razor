@@ -1,0 +1,196 @@
+@page "/"
+
+<h1>Week Plan</h1>
+
+<p>
+    Showing the week of <strong>@WeekStartDate.ToString("dddd d MMMM yyyy")</strong> to
+    <strong>@WeekStartDate.AddDays(6).ToString("dddd d MMMM yyyy")</strong>.
+</p>
+
+<div class="week-toolbar">
+    <button class="btn btn-secondary" @onclick="GoToPreviousWeekAsync" disabled="@IsBusy">&laquo; Previous week</button>
+    <button class="btn btn-secondary" @onclick="GoToNextWeekAsync" disabled="@IsBusy">Next week &raquo;</button>
+    <button class="btn btn-primary" @onclick="GenerateWeekAsync" disabled="@IsBusy">
+        @(IsBusy ? "Generating..." : "Generate random week")
+    </button>
+</div>
+
+@if (ErrorMessage is not null)
+{
+    <div class="alert alert-error">@ErrorMessage</div>
+}
+
+@if (SuccessMessage is not null)
+{
+    <div class="alert alert-success">@SuccessMessage</div>
+}
+
+@if (DayPlans is null)
+{
+    <p>Loading week plan...</p>
+}
+else
+{
+    @foreach (DayPlanResponseDto dayPlan in DayPlans)
+    {
+        <section class="day-section">
+            <h2>@dayPlan.Date.ToString("dddd d MMMM")</h2>
+
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Slot</th>
+                        <th>Meal</th>
+                        <th class="numeric">Kcal</th>
+                        <th class="numeric">Protein (g)</th>
+                        <th class="numeric">Carbs (g)</th>
+                        <th class="numeric">Fibre (g)</th>
+                        <th class="numeric">Plants</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (DayPlanMealDto meal in dayPlan.Meals)
+                    {
+                        <tr>
+                            <td>@meal.SlotKey</td>
+                            <td>@meal.Name</td>
+                            <td class="numeric">@meal.Kcal</td>
+                            <td class="numeric">@meal.ProteinG</td>
+                            <td class="numeric">@meal.CarbsG</td>
+                            <td class="numeric">@meal.FibreG</td>
+                            <td class="numeric">@meal.Plants</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="2"><strong>Total</strong></td>
+                        <td class="numeric">@dayPlan.Totals.Kcal</td>
+                        <td class="numeric">@dayPlan.Totals.ProteinG</td>
+                        <td class="numeric @CarbsCellCssClass(dayPlan)">@dayPlan.Totals.CarbsG</td>
+                        <td class="numeric">@dayPlan.Totals.FibreG</td>
+                        <td class="numeric">@dayPlan.Totals.Plants</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2"><strong>Remaining vs. target</strong></td>
+                        <td class="numeric">@dayPlan.Remaining.Kcal</td>
+                        <td class="numeric">@dayPlan.Remaining.ProteinG</td>
+                        <td class="numeric @CarbsCellCssClass(dayPlan)">@dayPlan.Remaining.CarbsG</td>
+                        <td class="numeric">@dayPlan.Remaining.FibreG</td>
+                        <td class="numeric">@dayPlan.Remaining.Plants</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </section>
+    }
+}
+
+<style>
+    .week-toolbar {
+        display: flex;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .day-section {
+        margin-bottom: 2rem;
+    }
+</style>
+
+@code {
+    /// <summary>The Monday that starts the week currently displayed on screen.</summary>
+    private DateOnly WeekStartDate { get; set; } = StartOfWeekContaining(DateOnly.FromDateTime(DateTime.Today));
+
+    /// <summary>One <see cref="DayPlanResponseDto"/> per day of the displayed week, in date order.</summary>
+    private List<DayPlanResponseDto>? DayPlans { get; set; }
+
+    private bool IsBusy { get; set; }
+    private string? ErrorMessage { get; set; }
+    private string? SuccessMessage { get; set; }
+
+    private const int DaysInWeek = 7;
+
+    [Inject]
+    private IWeekPlanGeneratorService WeekPlanGeneratorService { get; set; } = null!;
+
+    [Inject]
+    private IDayPlanService DayPlanService { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWeekAsync();
+    }
+
+    /// <summary>Reloads every day's plan (meals, totals, remaining-vs-target) for <see cref="WeekStartDate"/>.</summary>
+    private async Task LoadWeekAsync()
+    {
+        List<DayPlanResponseDto> loadedDayPlans = new(DaysInWeek);
+
+        for (int dayOffset = 0; dayOffset < DaysInWeek; dayOffset++)
+        {
+            DateOnly date = WeekStartDate.AddDays(dayOffset);
+            loadedDayPlans.Add(await DayPlanService.GetDayPlanAsync(date, CancellationToken.None));
+        }
+
+        DayPlans = loadedDayPlans;
+    }
+
+    private async Task GoToPreviousWeekAsync()
+    {
+        WeekStartDate = WeekStartDate.AddDays(-DaysInWeek);
+        ErrorMessage = null;
+        SuccessMessage = null;
+        await LoadWeekAsync();
+    }
+
+    private async Task GoToNextWeekAsync()
+    {
+        WeekStartDate = WeekStartDate.AddDays(DaysInWeek);
+        ErrorMessage = null;
+        SuccessMessage = null;
+        await LoadWeekAsync();
+    }
+
+    /// <summary>
+    /// Asks the generator to randomly fill every slot for every day of the displayed week, then
+    /// reloads the week so the freshly generated meals are shown.
+    /// </summary>
+    private async Task GenerateWeekAsync()
+    {
+        IsBusy = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        try
+        {
+            GenerateWeekPlanRequest request = new(WeekStartDate);
+            var (result, missingSlot, _) = await WeekPlanGeneratorService.GenerateWeekAsync(request, CancellationToken.None);
+
+            if (result == GenerateWeekPlanResult.NoMealsAvailableForSlot)
+            {
+                ErrorMessage = $"Cannot generate this week: no meals have been uploaded yet for the '{missingSlot}' slot.";
+                return;
+            }
+
+            await LoadWeekAsync();
+            SuccessMessage = "A new random week has been generated.";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>Highlights a day's carbohydrate total/remaining in red once it has gone over target.</summary>
+    private static string CarbsCellCssClass(DayPlanResponseDto dayPlan)
+    {
+        return dayPlan.Totals.CarbsG > dayPlan.Targets.DailyCarbTargetG ? "over-target" : "under-target";
+    }
+
+    /// <summary>Finds the Monday on or before <paramref name="date"/>.</summary>
+    private static DateOnly StartOfWeekContaining(DateOnly date)
+    {
+        int daysSinceMonday = ((int)date.DayOfWeek + 6) % 7;
+        return date.AddDays(-daysSinceMonday);
+    }
+}

@@ -9,6 +9,7 @@ public record UpsertMealRequest(
     SlotKey SlotKey,
     int Kcal,
     int ProteinG,
+    int CarbsG,
     int FibreG,
     int Plants,
     string? ZoeNotes,
@@ -24,6 +25,7 @@ public record UpsertMealRequest(
             RuleFor(x => x.SlotKey).NotEmpty().WithMessage("SlotKey is required");
             RuleFor(x => x.Kcal).GreaterThan(0);
             RuleFor(x => x.ProteinG).GreaterThanOrEqualTo(0);
+            RuleFor(x => x.CarbsG).GreaterThanOrEqualTo(0);
             RuleFor(x => x.FibreG).GreaterThanOrEqualTo(0);
             RuleFor(x => x.Plants).GreaterThanOrEqualTo(0);
             RuleFor(x => x.MfName).NotEmpty().WithMessage("MfName is required").MaximumLength(250);
