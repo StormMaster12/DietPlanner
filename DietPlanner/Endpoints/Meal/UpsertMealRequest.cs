@@ -14,7 +14,8 @@ public record UpsertMealRequest(
     int Plants,
     string? ZoeNotes,
     string MfName,
-    string? Notes)
+    string? Notes,
+    IReadOnlyList<UpsertMealIngredientRequest> Ingredients)
 {
     public class UpsertMealRequestValidator : AbstractValidator<UpsertMealRequest>
     {
@@ -29,6 +30,12 @@ public record UpsertMealRequest(
             RuleFor(x => x.FibreG).GreaterThanOrEqualTo(0);
             RuleFor(x => x.Plants).GreaterThanOrEqualTo(0);
             RuleFor(x => x.MfName).NotEmpty().WithMessage("MfName is required").MaximumLength(250);
+
+            RuleForEach(x => x.Ingredients).ChildRules(ingredient =>
+            {
+                ingredient.RuleFor(i => i.Name).NotEmpty().WithMessage("Ingredient name is required").MaximumLength(200);
+                ingredient.RuleFor(i => i.Quantity).GreaterThan(0).WithMessage("Ingredient quantity must be greater than zero");
+            });
         }
     }
 }

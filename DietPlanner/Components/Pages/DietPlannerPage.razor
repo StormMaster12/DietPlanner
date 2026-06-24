@@ -83,6 +83,31 @@ else
             </table>
         </section>
     }
+
+    <section class="shopping-list-section">
+        <h2>Weekly shopping list</h2>
+        <p>Every ingredient needed for the meals planned this week, with quantities added together across all 7 days.</p>
+
+        @if (WeeklyShoppingList.Count == 0)
+        {
+            <p>No ingredients to show yet - meals in this week's plan don't have any ingredients recorded, or no meals have been planned.</p>
+        }
+        else
+        {
+            <ul class="shopping-list">
+                @foreach (DayPlanIngredientDto ingredient in WeeklyShoppingList)
+                {
+                    <li>@FormatIngredientLine(ingredient)</li>
+                }
+            </ul>
+            <button class="btn btn-secondary" @onclick="CopyShoppingListToClipboardAsync">Copy shopping list</button>
+
+            @if (CopyStatusMessage is not null)
+            {
+                <span class="copy-status">@CopyStatusMessage</span>
+            }
+        }
+    </section>
 }
 
 <style>
@@ -95,6 +120,19 @@ else
     .day-section {
         margin-bottom: 2rem;
     }
+
+    .shopping-list-section {
+        margin-bottom: 2rem;
+    }
+
+    .shopping-list {
+        margin-bottom: 0.75rem;
+    }
+
+    .copy-status {
+        margin-left: 0.75rem;
+        color: #2f7d32;
+    }
 </style>
 
 @code {
@@ -104,9 +142,13 @@ else
     /// <summary>One <see cref="DayPlanResponseDto"/> per day of the displayed week, in date order.</summary>
     private List<DayPlanResponseDto>? DayPlans { get; set; }
 
+    /// <summary>Every ingredient needed this week, with matching name+unit combinations summed across all days.</summary>
+    private List<DayPlanIngredientDto> WeeklyShoppingList { get; set; } = new();
+
     private bool IsBusy { get; set; }
     private string? ErrorMessage { get; set; }
     private string? SuccessMessage { get; set; }
+    private string? CopyStatusMessage { get; set; }
 
     private const int DaysInWeek = 7;
 
@@ -115,6 +157,9 @@ else
 
     [Inject]
     private IDayPlanService DayPlanService { get; set; } = null!;
+
+    [Inject]
+    private IJSRuntime JsRuntime { get; set; } = null!;
 
     protected override async Task OnInitializedAsync()
     {
@@ -133,6 +178,47 @@ else
         }
 
         DayPlans = loadedDayPlans;
+        WeeklyShoppingList = BuildWeeklyShoppingList(loadedDayPlans);
+        CopyStatusMessage = null;
+    }
+
+    /// <summary>
+    /// Combines every ingredient across every meal in the week, summing the quantities of any
+    /// ingredients that share the same name and unit (e.g. two different meals both calling for
+    /// "g" of "Chicken breast" become a single combined shopping-list line).
+    /// </summary>
+    private static List<DayPlanIngredientDto> BuildWeeklyShoppingList(List<DayPlanResponseDto> dayPlans)
+    {
+        return dayPlans
+            .SelectMany(d => d.Meals)
+            .SelectMany(m => m.Ingredients)
+            .GroupBy(i => (i.Name, i.Unit))
+            .Select(g => new DayPlanIngredientDto(g.Key.Name, g.Sum(i => i.Quantity), g.Key.Unit))
+            .OrderBy(i => i.Name)
+            .ToList();
+    }
+
+    private static string FormatIngredientLine(DayPlanIngredientDto ingredient)
+    {
+        return string.IsNullOrWhiteSpace(ingredient.Unit)
+            ? $"{ingredient.Quantity} {ingredient.Name}"
+            : $"{ingredient.Quantity} {ingredient.Unit} {ingredient.Name}";
+    }
+
+    /// <summary>Copies the shopping list as plain text, one ingredient per line, to the clipboard.</summary>
+    private async Task CopyShoppingListToClipboardAsync()
+    {
+        string clipboardText = string.Join(Environment.NewLine, WeeklyShoppingList.Select(FormatIngredientLine));
+
+        try
+        {
+            await JsRuntime.InvokeVoidAsync("navigator.clipboard.writeText", clipboardText);
+            CopyStatusMessage = "Copied to clipboard.";
+        }
+        catch (Exception)
+        {
+            CopyStatusMessage = "Could not access the clipboard - select the list above and copy it manually instead.";
+        }
     }
 
     private async Task GoToPreviousWeekAsync()

@@ -12,6 +12,7 @@ public sealed class AppDbContext : DbContext
 
     public DbSet<Slot> Slots => Set<Slot>();
     public DbSet<Endpoints.Meal.MealEntry> Meals => Set<Endpoints.Meal.MealEntry>();
+    public DbSet<Endpoints.Meal.MealIngredient> MealIngredients => Set<Endpoints.Meal.MealIngredient>();
     public DbSet<WeekPlanEntry> WeekPlanEntries => Set<WeekPlanEntry>();
     public DbSet<Settings> Settings => Set<Settings>();
 
@@ -19,6 +20,7 @@ public sealed class AppDbContext : DbContext
     {
         b.ConfigureSlotEntity();
         b.ConfigureMealEntryEntity();
+        b.ConfigureMealIngredientEntity();
         b.AddWeekPlanEntry();
         b.AddSettings();
     }

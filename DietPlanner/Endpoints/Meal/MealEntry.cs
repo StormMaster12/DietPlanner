@@ -19,6 +19,8 @@ public sealed class MealEntry
     public string? ZoeNotes { get; set; }
     public required string MfName { get; set; }
     public string? Notes { get; set; }
+
+    public List<MealIngredient> Ingredients { get; set; } = new();
 }
 
 public static class ConfigureMealEntry

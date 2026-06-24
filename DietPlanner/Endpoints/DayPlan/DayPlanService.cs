@@ -23,6 +23,7 @@ public sealed class DayPlanService : IDayPlanService
             .AsNoTracking()
             .Where(x => x.Date == date)
             .Include(x => x.Meal)
+            .ThenInclude(m => m.Ingredients)
             .Include(x => x.Slot)
             .ToListAsync(cancellationToken);
 
@@ -36,6 +37,10 @@ public sealed class DayPlanService : IDayPlanService
             {
                 decimal mult = p.PortionMultiplier;
                 MealEntry m = p.Meal;
+
+                List<DayPlanIngredientDto> ingredients = m.Ingredients
+                    .Select(i => new DayPlanIngredientDto(i.Name, Math.Round(i.Quantity * mult, 2), i.Unit))
+                    .ToList();
 
                 return new DayPlanMealDto(
                     date,
@@ -51,7 +56,8 @@ public sealed class DayPlanService : IDayPlanService
                     Scale(m.FibreG, mult),
                     Scale(m.Plants, mult),
                     m.ZoeNotes,
-                    p.Notes
+                    p.Notes,
+                    ingredients
                 );
             })
             .OrderBy(x => x.SlotOrder)

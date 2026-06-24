@@ -13,4 +13,5 @@ int FibreG,
 int Plants,
 string? ZoeNotes,
 string MfName,
-string? Notes);
+string? Notes,
+IReadOnlyList<MealIngredientDto> Ingredients);

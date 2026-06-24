@@ -16,4 +16,5 @@ public sealed record DayPlanMealDto(
     int FibreG,
     int Plants,
     string? ZoeNotes,
-    string? Notes);
+    string? Notes,
+    IReadOnlyList<DayPlanIngredientDto> Ingredients);

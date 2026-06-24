@@ -72,6 +72,30 @@
                 <InputTextArea id="meal-notes" @bind-Value="FormModel.Notes" />
             </div>
 
+            <h3>Ingredients</h3>
+            <table class="ingredients-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Quantity</th>
+                        <th>Unit</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (MealIngredientFormModel ingredient in FormModel.Ingredients)
+                    {
+                        <tr>
+                            <td><InputText @bind-Value="ingredient.Name" placeholder="e.g. Chicken breast" /></td>
+                            <td><InputNumber @bind-Value="ingredient.Quantity" /></td>
+                            <td><InputText @bind-Value="ingredient.Unit" placeholder="e.g. g" /></td>
+                            <td><button type="button" class="btn btn-secondary" @onclick="() => RemoveIngredientRow(ingredient)">Remove</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <button type="button" class="btn btn-secondary" @onclick="AddIngredientRow">Add ingredient</button>
+
             @if (FormValidationErrors.Count > 0)
             {
                 <ul class="validation-message">
@@ -109,6 +133,7 @@ else
                 <th class="numeric">Carbs (g)</th>
                 <th class="numeric">Fibre (g)</th>
                 <th class="numeric">Plants</th>
+                <th>Ingredients</th>
                 <th></th>
             </tr>
         </thead>
@@ -124,6 +149,7 @@ else
                     <td class="numeric">@meal.CarbsG</td>
                     <td class="numeric">@meal.FibreG</td>
                     <td class="numeric">@meal.Plants</td>
+                    <td>@meal.Ingredients.Count</td>
                     <td>
                         <button class="btn btn-secondary" @onclick="() => StartEditingMeal(meal)">Edit</button>
                         <button class="btn btn-danger" @onclick="() => DeleteMealAsync(meal.MealId)">Delete</button>
@@ -141,6 +167,15 @@ else
         border-radius: 0.4rem;
         padding: 1rem 1.5rem;
         margin-bottom: 1.5rem;
+    }
+
+    .ingredients-table {
+        width: 100%;
+        margin-bottom: 0.75rem;
+    }
+
+    .ingredients-table input {
+        width: 100%;
     }
 </style>
 
@@ -196,7 +231,10 @@ else
             Plants = meal.Plants,
             MfName = meal.MfName,
             ZoeNotes = meal.ZoeNotes,
-            Notes = meal.Notes
+            Notes = meal.Notes,
+            Ingredients = meal.Ingredients
+                .Select(i => new MealIngredientFormModel { Name = i.Name, Quantity = i.Quantity, Unit = i.Unit })
+                .ToList()
         };
         IsEditingExistingMeal = true;
         IsFormVisible = true;
@@ -210,8 +248,26 @@ else
         FormValidationErrors.Clear();
     }
 
+    private void AddIngredientRow()
+    {
+        FormModel.Ingredients.Add(new MealIngredientFormModel());
+    }
+
+    private void RemoveIngredientRow(MealIngredientFormModel ingredient)
+    {
+        FormModel.Ingredients.Remove(ingredient);
+    }
+
     private async Task SaveMealAsync()
     {
+        // Blank ingredient rows (left over from "Add ingredient" without filling them in) are
+        // dropped here rather than rejected by validation, since users often add a row and then
+        // change their mind.
+        List<UpsertMealIngredientRequest> ingredients = FormModel.Ingredients
+            .Where(i => !string.IsNullOrWhiteSpace(i.Name))
+            .Select(i => new UpsertMealIngredientRequest(i.Name, i.Quantity, i.Unit))
+            .ToList();
+
         UpsertMealRequest request = new(
             FormModel.MealId,
             FormModel.Name,
@@ -223,7 +279,8 @@ else
             FormModel.Plants,
             FormModel.ZoeNotes,
             FormModel.MfName,
-            FormModel.Notes);
+            FormModel.Notes,
+            ingredients);
 
         FluentValidation.Results.ValidationResult validationResult = await MealValidator.ValidateAsync(request);
         if (!validationResult.IsValid)
@@ -274,5 +331,14 @@ else
         public string MfName { get; set; } = string.Empty;
         public string? ZoeNotes { get; set; }
         public string? Notes { get; set; }
+        public List<MealIngredientFormModel> Ingredients { get; set; } = new();
+    }
+
+    /// <summary>Mutable stand-in for <see cref="UpsertMealIngredientRequest"/>, for the same two-way binding reason as <see cref="MealFormModel"/>.</summary>
+    private sealed class MealIngredientFormModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public decimal Quantity { get; set; }
+        public string? Unit { get; set; }
     }
 }
