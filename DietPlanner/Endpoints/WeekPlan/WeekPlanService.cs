@@ -46,7 +46,7 @@ public sealed class WeekPlanService : IWeekPlanService
         }
         else
         {
-            existing = existing with { MealId = request.MealId, PortionMultiplier = request.PortionMultiplier, Notes = request.Notes };
+            _db.Entry(existing).CurrentValues.SetValues(existing with { MealId = request.MealId, PortionMultiplier = request.PortionMultiplier, Notes = request.Notes });
         }
 
         await _db.SaveChangesAsync(cancellationToken);
@@ -87,12 +87,12 @@ public sealed class WeekPlanService : IWeekPlanService
             }
             else
             {
-                existing = existing with
+                _db.Entry(existing).CurrentValues.SetValues(existing with
                 {
                     MealId = e.MealId,
                     PortionMultiplier = e.PortionMultiplier,
                     Notes = e.Notes
-                };
+                });
             }
         }
 

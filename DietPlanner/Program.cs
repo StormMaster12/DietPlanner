@@ -24,7 +24,7 @@ services.AddSassCompiler();
 // server-side (Blazor Server) so the UI can call straight into the same EF Core services that
 // back the minimal API below, without needing a separate JavaScript HTTP client layer.
 services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents(options => options.DetailedErrors = builder.Environment.IsDevelopment());
 
 services.AddScoped<ISettingsService, SettingsService>()
     .AddScoped<IDayPlanService, DayPlanService>()
@@ -61,3 +61,5 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+
+public partial class Program { }

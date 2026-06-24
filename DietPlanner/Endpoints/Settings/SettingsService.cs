@@ -65,7 +65,7 @@ public sealed class SettingsService : ISettingsService
         }
         else
         {
-            row = row with { Value = value };
+            _db.Entry(row).CurrentValues.SetValues(row with { Value = value });
         }
     }
 }
