@@ -1,0 +1,28 @@
+.nav__header {
+  font-size: 1.25rem;
+  font-weight: 700;
+  padding: var(--space-5) var(--space-4);
+  border-bottom: 1px solid var(--color-sidebar-border);
+}
+.nav__links {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-3) 0;
+}
+.nav__links ::deep .nav__link {
+  display: block;
+  padding: 0.6rem var(--space-5);
+  color: var(--color-sidebar-text);
+  text-decoration: none;
+}
+.nav__links ::deep .nav__link:hover {
+  background-color: var(--color-sidebar-link-hover-bg);
+  color: var(--color-sidebar-text-active);
+}
+.nav__links ::deep .nav__link--active {
+  background-color: var(--color-sidebar-link-active-bg);
+  color: var(--color-sidebar-text-active);
+  font-weight: 600;
+}
+
+/*# sourceMappingURL=NavMenu.razor.css.map */

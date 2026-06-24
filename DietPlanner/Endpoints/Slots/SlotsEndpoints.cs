@@ -7,7 +7,7 @@ public static class SlotsEndpoints
 {
     public static IEndpointRouteBuilder MapSlotsEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        RouteGroupBuilder group = endpoints.MapGroup("/slots")
+        RouteGroupBuilder group = endpoints.MapGroup("/api/slots")
             .WithTags("Slots");
 
         group.MapGet("/", GetSlotsAsync).WithOpenApi();

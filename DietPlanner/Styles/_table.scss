@@ -1,0 +1,36 @@
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: var(--color-bg-surface);
+    box-shadow: var(--shadow-sm);
+
+    th,
+    td {
+        padding: var(--space-2) var(--space-3);
+        border-bottom: 1px solid var(--color-border-subtle);
+        text-align: left;
+        vertical-align: top;
+    }
+
+    th {
+        background-color: var(--color-table-head-bg);
+        font-weight: 600;
+    }
+}
+
+// Per-cell value styling (numeric alignment, over/under-target colouring) is
+// independent of the table block, since only some cells in a row need it.
+.table__value {
+    &--numeric {
+        text-align: right;
+    }
+
+    &--over-target {
+        color: var(--color-error-text);
+        font-weight: 700;
+    }
+
+    &--under-target {
+        color: var(--color-success-text);
+    }
+}

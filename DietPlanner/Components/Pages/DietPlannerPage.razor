@@ -1,0 +1,259 @@
+@page "/"
+
+<h1>Week Plan</h1>
+
+<p>
+    Showing the week of <strong>@WeekStartDate.ToString("dddd d MMMM yyyy")</strong> to
+    <strong>@WeekStartDate.AddDays(6).ToString("dddd d MMMM yyyy")</strong>.
+</p>
+
+<div class="week-plan__toolbar">
+    <button class="btn btn--secondary" @onclick="GoToPreviousWeekAsync" disabled="@IsBusy">&laquo; Previous week</button>
+    <button class="btn btn--secondary" @onclick="GoToNextWeekAsync" disabled="@IsBusy">Next week &raquo;</button>
+    <button class="btn btn--primary" @onclick="GenerateWeekAsync" disabled="@IsBusy">
+        @(IsBusy ? "Generating..." : "Generate random week")
+    </button>
+</div>
+
+@if (ErrorMessage is not null)
+{
+    <div class="alert alert--error">@ErrorMessage</div>
+}
+
+@if (SuccessMessage is not null)
+{
+    <div class="alert alert--success">@SuccessMessage</div>
+}
+
+@if (DayPlans is null)
+{
+    <p>Loading week plan...</p>
+}
+else
+{
+    @foreach (DayPlanResponseDto dayPlan in DayPlans)
+    {
+        <section class="week-plan__day">
+            <h2>@dayPlan.Date.ToString("dddd d MMMM")</h2>
+
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Slot</th>
+                        <th>Meal</th>
+                        <th class="table__value--numeric">Kcal</th>
+                        <th class="table__value--numeric">Protein (g)</th>
+                        <th class="table__value--numeric">Carbs (g)</th>
+                        <th class="table__value--numeric">Fibre (g)</th>
+                        <th class="table__value--numeric">Plants</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (DayPlanMealDto meal in dayPlan.Meals)
+                    {
+                        <tr>
+                            <td>@meal.SlotKey</td>
+                            <td>@meal.Name</td>
+                            <td class="table__value--numeric">@meal.Kcal</td>
+                            <td class="table__value--numeric">@meal.ProteinG</td>
+                            <td class="table__value--numeric">@meal.CarbsG</td>
+                            <td class="table__value--numeric">@meal.FibreG</td>
+                            <td class="table__value--numeric">@meal.Plants</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="2"><strong>Total</strong></td>
+                        <td class="table__value--numeric">@dayPlan.Totals.Kcal</td>
+                        <td class="table__value--numeric">@dayPlan.Totals.ProteinG</td>
+                        <td class="table__value--numeric @CarbsCellModifierClass(dayPlan)">@dayPlan.Totals.CarbsG</td>
+                        <td class="table__value--numeric">@dayPlan.Totals.FibreG</td>
+                        <td class="table__value--numeric">@dayPlan.Totals.Plants</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2"><strong>Remaining vs. target</strong></td>
+                        <td class="table__value--numeric">@dayPlan.Remaining.Kcal</td>
+                        <td class="table__value--numeric">@dayPlan.Remaining.ProteinG</td>
+                        <td class="table__value--numeric @CarbsCellModifierClass(dayPlan)">@dayPlan.Remaining.CarbsG</td>
+                        <td class="table__value--numeric">@dayPlan.Remaining.FibreG</td>
+                        <td class="table__value--numeric">@dayPlan.Remaining.Plants</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </section>
+    }
+
+    <section class="shopping-list">
+        <h2>Weekly shopping list</h2>
+        <p>Every ingredient needed for the meals planned this week, with quantities added together across all 7 days.</p>
+
+        @if (WeeklyShoppingList.Count == 0)
+        {
+            <p>No ingredients to show yet - meals in this week's plan don't have any ingredients recorded, or no meals have been planned.</p>
+        }
+        else
+        {
+            <ul class="shopping-list__items">
+                @foreach (DayPlanIngredientDto ingredient in WeeklyShoppingList)
+                {
+                    <li class="shopping-list__item">@FormatIngredientLine(ingredient)</li>
+                }
+            </ul>
+            <button class="btn btn--secondary" @onclick="CopyShoppingListToClipboardAsync">Copy shopping list</button>
+
+            @if (CopyStatusMessage is not null)
+            {
+                <span class="shopping-list__copy-status">@CopyStatusMessage</span>
+            }
+        }
+    </section>
+}
+
+@code {
+    /// <summary>The Monday that starts the week currently displayed on screen.</summary>
+    private DateOnly WeekStartDate { get; set; } = StartOfWeekContaining(DateOnly.FromDateTime(DateTime.Today));
+
+    /// <summary>One <see cref="DayPlanResponseDto"/> per day of the displayed week, in date order.</summary>
+    private List<DayPlanResponseDto>? DayPlans { get; set; }
+
+    /// <summary>Every ingredient needed this week, with matching name+unit combinations summed across all days.</summary>
+    private List<DayPlanIngredientDto> WeeklyShoppingList { get; set; } = new();
+
+    private bool IsBusy { get; set; }
+    private string? ErrorMessage { get; set; }
+    private string? SuccessMessage { get; set; }
+    private string? CopyStatusMessage { get; set; }
+
+    private const int DaysInWeek = 7;
+
+    [Inject]
+    private IWeekPlanGeneratorService WeekPlanGeneratorService { get; set; } = null!;
+
+    [Inject]
+    private IDayPlanService DayPlanService { get; set; } = null!;
+
+    [Inject]
+    private IJSRuntime JsRuntime { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWeekAsync();
+    }
+
+    /// <summary>Reloads every day's plan (meals, totals, remaining-vs-target) for <see cref="WeekStartDate"/>.</summary>
+    private async Task LoadWeekAsync()
+    {
+        List<DayPlanResponseDto> loadedDayPlans = new(DaysInWeek);
+
+        for (int dayOffset = 0; dayOffset < DaysInWeek; dayOffset++)
+        {
+            DateOnly date = WeekStartDate.AddDays(dayOffset);
+            loadedDayPlans.Add(await DayPlanService.GetDayPlanAsync(date, CancellationToken.None));
+        }
+
+        DayPlans = loadedDayPlans;
+        WeeklyShoppingList = BuildWeeklyShoppingList(loadedDayPlans);
+        CopyStatusMessage = null;
+    }
+
+    /// <summary>
+    /// Combines every ingredient across every meal in the week, summing the quantities of any
+    /// ingredients that share the same name and unit (e.g. two different meals both calling for
+    /// "g" of "Chicken breast" become a single combined shopping-list line).
+    /// </summary>
+    private static List<DayPlanIngredientDto> BuildWeeklyShoppingList(List<DayPlanResponseDto> dayPlans)
+    {
+        return dayPlans
+            .SelectMany(d => d.Meals)
+            .SelectMany(m => m.Ingredients)
+            .GroupBy(i => (i.Name, i.Unit))
+            .Select(g => new DayPlanIngredientDto(g.Key.Name, g.Sum(i => i.Quantity), g.Key.Unit))
+            .OrderBy(i => i.Name)
+            .ToList();
+    }
+
+    private static string FormatIngredientLine(DayPlanIngredientDto ingredient)
+    {
+        return string.IsNullOrWhiteSpace(ingredient.Unit)
+            ? $"{ingredient.Quantity} {ingredient.Name}"
+            : $"{ingredient.Quantity} {ingredient.Unit} {ingredient.Name}";
+    }
+
+    /// <summary>Copies the shopping list as plain text, one ingredient per line, to the clipboard.</summary>
+    private async Task CopyShoppingListToClipboardAsync()
+    {
+        string clipboardText = string.Join(Environment.NewLine, WeeklyShoppingList.Select(FormatIngredientLine));
+
+        try
+        {
+            await JsRuntime.InvokeVoidAsync("navigator.clipboard.writeText", clipboardText);
+            CopyStatusMessage = "Copied to clipboard.";
+        }
+        catch (Exception)
+        {
+            CopyStatusMessage = "Could not access the clipboard - select the list above and copy it manually instead.";
+        }
+    }
+
+    private async Task GoToPreviousWeekAsync()
+    {
+        WeekStartDate = WeekStartDate.AddDays(-DaysInWeek);
+        ErrorMessage = null;
+        SuccessMessage = null;
+        await LoadWeekAsync();
+    }
+
+    private async Task GoToNextWeekAsync()
+    {
+        WeekStartDate = WeekStartDate.AddDays(DaysInWeek);
+        ErrorMessage = null;
+        SuccessMessage = null;
+        await LoadWeekAsync();
+    }
+
+    /// <summary>
+    /// Asks the generator to randomly fill every slot for every day of the displayed week, then
+    /// reloads the week so the freshly generated meals are shown.
+    /// </summary>
+    private async Task GenerateWeekAsync()
+    {
+        IsBusy = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        try
+        {
+            GenerateWeekPlanRequest request = new(WeekStartDate);
+            var (result, missingSlot, _) = await WeekPlanGeneratorService.GenerateWeekAsync(request, CancellationToken.None);
+
+            if (result == GenerateWeekPlanResult.NoMealsAvailableForSlot)
+            {
+                ErrorMessage = $"Cannot generate this week: no meals have been uploaded yet for the '{missingSlot}' slot.";
+                return;
+            }
+
+            await LoadWeekAsync();
+            SuccessMessage = "A new random week has been generated.";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>Highlights a day's carbohydrate total/remaining in red once it has gone over target.</summary>
+    private static string CarbsCellModifierClass(DayPlanResponseDto dayPlan)
+    {
+        return dayPlan.Totals.CarbsG > dayPlan.Targets.DailyCarbTargetG
+            ? "table__value--over-target"
+            : "table__value--under-target";
+    }
+
+    /// <summary>Finds the Monday on or before <paramref name="date"/>.</summary>
+    private static DateOnly StartOfWeekContaining(DateOnly date)
+    {
+        int daysSinceMonday = ((int)date.DayOfWeek + 6) % 7;
+        return date.AddDays(-daysSinceMonday);
+    }
+}

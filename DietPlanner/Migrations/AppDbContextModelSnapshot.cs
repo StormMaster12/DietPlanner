@@ -23,6 +23,9 @@ namespace DietPlanner.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("CarbsG")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("FibreG")
                         .HasColumnType("INTEGER");
 
@@ -57,6 +60,32 @@ namespace DietPlanner.Migrations
                     b.HasIndex("SlotKey");
 
                     b.ToTable("Meals");
+                });
+
+            modelBuilder.Entity("DietPlanner.Endpoints.Meal.MealIngredient", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("MealId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Unit")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MealId");
+
+                    b.ToTable("MealIngredients");
                 });
 
             modelBuilder.Entity("DietPlanner.Endpoints.Settings.Settings", b =>
@@ -135,6 +164,17 @@ namespace DietPlanner.Migrations
                     b.Navigation("Slot");
                 });
 
+            modelBuilder.Entity("DietPlanner.Endpoints.Meal.MealIngredient", b =>
+                {
+                    b.HasOne("DietPlanner.Endpoints.Meal.MealEntry", "Meal")
+                        .WithMany("Ingredients")
+                        .HasForeignKey("MealId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Meal");
+                });
+
             modelBuilder.Entity("DietPlanner.Endpoints.WeekPlan.WeekPlanEntry", b =>
                 {
                     b.HasOne("DietPlanner.Endpoints.Meal.MealEntry", "Meal")
@@ -152,6 +192,11 @@ namespace DietPlanner.Migrations
                     b.Navigation("Meal");
 
                     b.Navigation("Slot");
+                });
+
+            modelBuilder.Entity("DietPlanner.Endpoints.Meal.MealEntry", b =>
+                {
+                    b.Navigation("Ingredients");
                 });
 #pragma warning restore 612, 618
         }

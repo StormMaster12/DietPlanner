@@ -1,0 +1,118 @@
+@page "/settings"
+
+<h1>Daily Targets</h1>
+
+<p>These daily macro targets are used to compute the "remaining" totals on the Week Plan page and to decide whether a randomly generated day's carbohydrates count as over target.</p>
+
+@if (FormModel is null)
+{
+    <p>Loading settings...</p>
+}
+else
+{
+    <EditForm Model="FormModel" OnSubmit="SaveSettingsAsync" class="form">
+        <div class="form__row">
+            <label class="form__label" for="target-kcal">Daily kcal target</label>
+            <InputNumber id="target-kcal" class="form__control" @bind-Value="FormModel.DailyKcalTarget" />
+        </div>
+
+        <div class="form__row">
+            <label class="form__label" for="target-protein">Daily protein target (g)</label>
+            <InputNumber id="target-protein" class="form__control" @bind-Value="FormModel.DailyProteinTargetG" />
+        </div>
+
+        <div class="form__row">
+            <label class="form__label" for="target-carbs">Daily carb target (g)</label>
+            <InputNumber id="target-carbs" class="form__control" @bind-Value="FormModel.DailyCarbTargetG" />
+        </div>
+
+        <div class="form__row">
+            <label class="form__label" for="target-fibre">Daily fibre target (g)</label>
+            <InputNumber id="target-fibre" class="form__control" @bind-Value="FormModel.DailyFibreTargetG" />
+        </div>
+
+        <div class="form__row">
+            <label class="form__label" for="target-plants">Daily plant points target</label>
+            <InputNumber id="target-plants" class="form__control" @bind-Value="FormModel.DailyPlantsTarget" />
+        </div>
+
+        @if (FormValidationErrors.Count > 0)
+        {
+            <ul class="form__errors">
+                @foreach (string validationError in FormValidationErrors)
+                {
+                    <li>@validationError</li>
+                }
+            </ul>
+        }
+
+        <button type="submit" class="btn btn--primary">Save targets</button>
+    </EditForm>
+
+    @if (SuccessMessage is not null)
+    {
+        <div class="alert alert--success">@SuccessMessage</div>
+    }
+}
+
+@code {
+    private SettingsFormModel? FormModel { get; set; }
+    private List<string> FormValidationErrors { get; set; } = new();
+    private string? SuccessMessage { get; set; }
+
+    [Inject]
+    private ISettingsService SettingsService { get; set; } = null!;
+
+    [Inject]
+    private FluentValidation.IValidator<UpdateSettingsRequest> SettingsValidator { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SettingsDto currentSettings = await SettingsService.GetAsync(CancellationToken.None);
+        FormModel = new SettingsFormModel
+        {
+            DailyKcalTarget = currentSettings.DailyKcalTarget,
+            DailyProteinTargetG = currentSettings.DailyProteinTargetG,
+            DailyCarbTargetG = currentSettings.DailyCarbTargetG,
+            DailyFibreTargetG = currentSettings.DailyFibreTargetG,
+            DailyPlantsTarget = currentSettings.DailyPlantsTarget
+        };
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        if (FormModel is null)
+        {
+            return;
+        }
+
+        UpdateSettingsRequest request = new(
+            FormModel.DailyKcalTarget,
+            FormModel.DailyProteinTargetG,
+            FormModel.DailyCarbTargetG,
+            FormModel.DailyFibreTargetG,
+            FormModel.DailyPlantsTarget);
+
+        FluentValidation.Results.ValidationResult validationResult = await SettingsValidator.ValidateAsync(request);
+        if (!validationResult.IsValid)
+        {
+            FormValidationErrors = validationResult.Errors.Select(e => e.ErrorMessage).ToList();
+            SuccessMessage = null;
+            return;
+        }
+
+        await SettingsService.UpdateAsync(request, CancellationToken.None);
+        FormValidationErrors.Clear();
+        SuccessMessage = "Daily targets saved.";
+    }
+
+    /// <summary>Mutable stand-in for <see cref="UpdateSettingsRequest"/> so InputNumber can two-way bind to it.</summary>
+    private sealed class SettingsFormModel
+    {
+        public int DailyKcalTarget { get; set; }
+        public int DailyProteinTargetG { get; set; }
+        public int DailyCarbTargetG { get; set; }
+        public int DailyFibreTargetG { get; set; }
+        public int DailyPlantsTarget { get; set; }
+    }
+}

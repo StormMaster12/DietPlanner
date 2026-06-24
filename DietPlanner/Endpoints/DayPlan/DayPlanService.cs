@@ -23,6 +23,7 @@ public sealed class DayPlanService : IDayPlanService
             .AsNoTracking()
             .Where(x => x.Date == date)
             .Include(x => x.Meal)
+            .ThenInclude(m => m.Ingredients)
             .Include(x => x.Slot)
             .ToListAsync(cancellationToken);
 
@@ -37,6 +38,10 @@ public sealed class DayPlanService : IDayPlanService
                 decimal mult = p.PortionMultiplier;
                 MealEntry m = p.Meal;
 
+                List<DayPlanIngredientDto> ingredients = m.Ingredients
+                    .Select(i => new DayPlanIngredientDto(i.Name, Math.Round(i.Quantity * mult, 2), i.Unit))
+                    .ToList();
+
                 return new DayPlanMealDto(
                     date,
                     p.SlotKey,
@@ -47,10 +52,12 @@ public sealed class DayPlanService : IDayPlanService
                     mult,
                     Scale(m.Kcal, mult),
                     Scale(m.ProteinG, mult),
+                    Scale(m.CarbsG, mult),
                     Scale(m.FibreG, mult),
                     Scale(m.Plants, mult),
                     m.ZoeNotes,
-                    p.Notes
+                    p.Notes,
+                    ingredients
                 );
             })
             .OrderBy(x => x.SlotOrder)
@@ -59,12 +66,14 @@ public sealed class DayPlanService : IDayPlanService
         DayPlanTotalsDto totals = new(
             items.Sum(i => i.Kcal),
             items.Sum(i => i.ProteinG),
+            items.Sum(i => i.CarbsG),
             items.Sum(i => i.FibreG),
             items.Sum(i => i.Plants));
 
         DayPlanTotalsDto remaining = new(
             targets.DailyKcalTarget - totals.Kcal,
             targets.DailyProteinTargetG - totals.ProteinG,
+            targets.DailyCarbTargetG - totals.CarbsG,
             targets.DailyFibreTargetG - totals.FibreG,
             targets.DailyPlantsTarget - totals.Plants);
 

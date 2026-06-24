@@ -1,0 +1,17 @@
+.meal-form {
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-6);
+  margin-bottom: var(--space-6);
+}
+
+.ingredient-table {
+  width: 100%;
+  margin-bottom: var(--space-3);
+}
+.ingredient-table__input {
+  width: 100%;
+}
+
+/*# sourceMappingURL=MealsPage.razor.css.map */

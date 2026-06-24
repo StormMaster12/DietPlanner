@@ -9,15 +9,30 @@ public static class WeekPlanEndpoints
 {
     public static IEndpointRouteBuilder MapWeekEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        RouteGroupBuilder group = endpoints.MapGroup("/week")
+        RouteGroupBuilder group = endpoints.MapGroup("/api/week")
             .WithTags("WeekPlan");
 
         group.MapGet("/", GetWeekAsync).WithOpenApi();
         group.MapPut("/entry", UpsertEntryAsync).WithOpenApi();
         group.MapPut("/set", SetWeekAsync).WithOpenApi();
+        group.MapPost("/generate", GenerateWeekAsync).WithOpenApi();
         group.MapDelete("/entry/{date}/{slotKey}", DeleteEntryAsync).WithOpenApi();
 
         return endpoints;
+    }
+
+    public static async Task<Results<Ok<IReadOnlyList<WeekPlanEntryDto>>, BadRequest<string>>> GenerateWeekAsync(
+        [FromBody] GenerateWeekPlanRequest req,
+        [FromServices] IWeekPlanGeneratorService generatorService,
+        CancellationToken cancellationToken)
+    {
+        var (result, missingSlot, entries) = await generatorService.GenerateWeekAsync(req, cancellationToken);
+        return result switch
+        {
+            GenerateWeekPlanResult.NoMealsAvailableForSlot => TypedResults.BadRequest($"No meals exist for slot '{missingSlot}'. Add at least one meal for that slot before generating a week."),
+            GenerateWeekPlanResult.Success => TypedResults.Ok(entries),
+            _ => throw new NotImplementedException()
+        };
     }
 
     public static async Task<Ok<IReadOnlyList<WeekPlanEntryDto>>> GetWeekAsync([FromQuery] DateOnly start, [FromQuery] DateOnly end, [FromServices] IWeekPlanService weekPlanService, CancellationToken cancellationToken)

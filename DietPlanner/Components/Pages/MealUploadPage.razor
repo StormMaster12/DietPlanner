@@ -1,0 +1,67 @@
+@page "/meals/upload"
+
+<h1>Upload Meals</h1>
+
+<p>
+    Bulk-load meals from a CSV file. The first row must be a header row containing exactly these
+    column names (any order): <code>Name, SlotKey, Kcal, ProteinG, CarbsG, FibreG, Plants, MfName,
+    ZoeNotes, Notes</code>. <code>SlotKey</code> must be one of:
+    @string.Join(", ", Enum.GetNames<SlotKey>()). Uploading a meal whose Name and SlotKey already
+    exist in the database updates that meal's macros instead of creating a duplicate.
+</p>
+
+<div class="form__row">
+    <InputFile OnChange="OnFileSelectedAsync" accept=".csv" />
+</div>
+
+@if (IsUploading)
+{
+    <p>Uploading and importing...</p>
+}
+
+@if (ImportResult is not null)
+{
+    <div class="alert @(ImportResult.RowErrors.Count > 0 ? "alert--error" : "alert--success")">
+        <p>
+            Inserted @ImportResult.InsertedCount new meal(s) and updated @ImportResult.UpdatedCount
+            existing meal(s).
+        </p>
+
+        @if (ImportResult.RowErrors.Count > 0)
+        {
+            <p>The following rows could not be imported and were skipped:</p>
+            <ul>
+                @foreach (string rowError in ImportResult.RowErrors)
+                {
+                    <li>@rowError</li>
+                }
+            </ul>
+        }
+    </div>
+}
+
+@code {
+    private const long MaxUploadSizeBytes = 5 * 1024 * 1024;
+
+    private bool IsUploading { get; set; }
+    private MealImportResult? ImportResult { get; set; }
+
+    [Inject]
+    private IMealImportService MealImportService { get; set; } = null!;
+
+    private async Task OnFileSelectedAsync(InputFileChangeEventArgs changeEventArgs)
+    {
+        IsUploading = true;
+        ImportResult = null;
+
+        try
+        {
+            await using Stream uploadedFileStream = changeEventArgs.File.OpenReadStream(MaxUploadSizeBytes);
+            ImportResult = await MealImportService.ImportFromCsvAsync(uploadedFileStream, CancellationToken.None);
+        }
+        finally
+        {
+            IsUploading = false;
+        }
+    }
+}

@@ -1,0 +1,153 @@
+:root {
+  --color-text: #1f2933;
+  --color-bg-page: #f5f7fa;
+  --color-bg-surface: #ffffff;
+  --color-border: #cbd2d9;
+  --color-border-subtle: #e4e7eb;
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-danger: #dc2626;
+  --color-danger-hover: #b91c1c;
+  --color-success-text: #1e8449;
+  --color-success-bg: #e3f7e9;
+  --color-success-border: #b6e6c4;
+  --color-error-text: #c0392b;
+  --color-error-bg: #fdecea;
+  --color-error-border: #f6c1bb;
+  --color-table-head-bg: #eef2f7;
+  --color-sidebar-bg: #1b2a3a;
+  --color-sidebar-text: #c9d6e3;
+  --color-sidebar-text-active: #ffffff;
+  --color-sidebar-border: rgba(255, 255, 255, 0.15);
+  --color-sidebar-link-hover-bg: rgba(255, 255, 255, 0.08);
+  --color-sidebar-link-active-bg: rgba(255, 255, 255, 0.15);
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.3rem;
+  --radius-lg: 0.4rem;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --font-family-base: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-size-sm: 0.85rem;
+  --sidebar-width: 16rem;
+  --content-max-width: 70rem;
+  --form-row-max-width: 24rem;
+}
+
+html,
+body {
+  margin: 0;
+  font-family: var(--font-family-base);
+  color: var(--color-text);
+}
+
+h1,
+h2,
+h3 {
+  margin-top: 0;
+}
+
+.btn {
+  display: inline-block;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-weight: 600;
+}
+.btn--primary {
+  background-color: var(--color-primary);
+  color: var(--color-bg-surface);
+}
+.btn--primary:hover {
+  background-color: var(--color-primary-hover);
+}
+.btn--danger {
+  background-color: var(--color-danger);
+  color: var(--color-bg-surface);
+}
+.btn--danger:hover {
+  background-color: var(--color-danger-hover);
+}
+.btn--secondary {
+  background-color: var(--color-bg-surface);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+.btn--secondary:hover {
+  background-color: var(--color-bg-page);
+}
+
+.alert {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+}
+.alert--success {
+  background-color: var(--color-success-bg);
+  color: var(--color-success-text);
+  border: 1px solid var(--color-success-border);
+}
+.alert--error {
+  background-color: var(--color-error-bg);
+  color: var(--color-error-text);
+  border: 1px solid var(--color-error-border);
+}
+
+.form__row {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: var(--space-3);
+  max-width: var(--form-row-max-width);
+}
+.form__label {
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+}
+.form__control {
+  padding: 0.4rem var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.form__errors {
+  list-style: none;
+  padding-left: 0;
+  color: var(--color-error-text);
+  font-size: var(--font-size-sm);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: var(--color-bg-surface);
+  box-shadow: var(--shadow-sm);
+}
+.table th,
+.table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
+  text-align: left;
+  vertical-align: top;
+}
+.table th {
+  background-color: var(--color-table-head-bg);
+  font-weight: 600;
+}
+
+.table__value--numeric {
+  text-align: right;
+}
+.table__value--over-target {
+  color: var(--color-error-text);
+  font-weight: 700;
+}
+.table__value--under-target {
+  color: var(--color-success-text);
+}
+
+/*# sourceMappingURL=app.css.map */

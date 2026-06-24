@@ -1,0 +1,36 @@
+.nav {
+    &__header {
+        font-size: 1.25rem;
+        font-weight: 700;
+        padding: var(--space-5) var(--space-4);
+        border-bottom: 1px solid var(--color-sidebar-border);
+    }
+
+    &__links {
+        display: flex;
+        flex-direction: column;
+        padding: var(--space-3) 0;
+
+        // NavLink renders its <a> from a child component, so the scope
+        // attribute Blazor adds to this file's own markup never reaches it -
+        // ::deep drops that requirement and falls back to a normal descendant
+        // selector instead.
+        ::deep .nav__link {
+            display: block;
+            padding: 0.6rem var(--space-5);
+            color: var(--color-sidebar-text);
+            text-decoration: none;
+
+            &:hover {
+                background-color: var(--color-sidebar-link-hover-bg);
+                color: var(--color-sidebar-text-active);
+            }
+
+            &--active {
+                background-color: var(--color-sidebar-link-active-bg);
+                color: var(--color-sidebar-text-active);
+                font-weight: 600;
+            }
+        }
+    }
+}

@@ -8,6 +8,7 @@ public sealed class SettingsService : ISettingsService
 
     private const int DefaultKcal = 2300;
     private const int DefaultProtein = 165;
+    private const int DefaultCarbs = 220;
     private const int DefaultFibre = 30;
     private const int DefaultPlants = 30;
 
@@ -25,6 +26,7 @@ public sealed class SettingsService : ISettingsService
         return new SettingsDto(
             GetInt(map, "daily_kcal_target", DefaultKcal),
             GetInt(map, "daily_protein_target_g", DefaultProtein),
+            GetInt(map, "daily_carb_target_g", DefaultCarbs),
             GetInt(map, "daily_fibre_target_g", DefaultFibre),
             GetInt(map, "daily_plants_target", DefaultPlants)
         );
@@ -34,6 +36,7 @@ public sealed class SettingsService : ISettingsService
     {
         await UpsertKeyAsync("daily_kcal_target", req.DailyKcalTarget.ToString(), ct);
         await UpsertKeyAsync("daily_protein_target_g", req.DailyProteinTargetG.ToString(), ct);
+        await UpsertKeyAsync("daily_carb_target_g", req.DailyCarbTargetG.ToString(), ct);
         await UpsertKeyAsync("daily_fibre_target_g", req.DailyFibreTargetG.ToString(), ct);
         await UpsertKeyAsync("daily_plants_target", req.DailyPlantsTarget.ToString(), ct);
 
@@ -42,6 +45,7 @@ public sealed class SettingsService : ISettingsService
         return new SettingsDto(
             req.DailyKcalTarget,
             req.DailyProteinTargetG,
+            req.DailyCarbTargetG,
             req.DailyFibreTargetG,
             req.DailyPlantsTarget
         );

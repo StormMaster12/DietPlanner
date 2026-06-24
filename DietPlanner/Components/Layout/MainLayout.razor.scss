@@ -1,0 +1,21 @@
+.layout {
+    display: flex;
+    min-height: 100vh;
+
+    &__sidebar {
+        width: var(--sidebar-width);
+        flex-shrink: 0;
+        background-color: var(--color-sidebar-bg);
+        color: var(--color-bg-surface);
+    }
+
+    &__main {
+        flex: 1;
+        background-color: var(--color-bg-page);
+    }
+
+    &__content {
+        padding: var(--space-6) var(--space-8);
+        max-width: var(--content-max-width);
+    }
+}
