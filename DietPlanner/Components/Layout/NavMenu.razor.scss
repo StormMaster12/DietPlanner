@@ -33,4 +33,22 @@
             }
         }
     }
+
+    &__theme-toggle {
+        display: block;
+        width: 100%;
+        margin-top: auto;
+        padding: var(--space-3) var(--space-5);
+        background: none;
+        border: none;
+        border-top: 1px solid var(--color-sidebar-border);
+        color: var(--color-sidebar-text);
+        text-align: left;
+        cursor: pointer;
+
+        &:hover {
+            background-color: var(--color-sidebar-link-hover-bg);
+            color: var(--color-sidebar-text-active);
+        }
+    }
 }
