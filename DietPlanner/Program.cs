@@ -16,6 +16,10 @@ var services = builder.Services;
 services.AddEndpointsApiExplorer();
 services.AddSwaggerGen();
 
+#if DEBUG
+services.AddSassCompiler();
+#endif
+
 // Razor Components power the interactive Diet Planner / Meals / Settings web pages, rendered
 // server-side (Blazor Server) so the UI can call straight into the same EF Core services that
 // back the minimal API below, without needing a separate JavaScript HTTP client layer.

@@ -10,35 +10,35 @@
 }
 else
 {
-    <EditForm Model="FormModel" OnSubmit="SaveSettingsAsync" class="edit-form">
-        <div class="form-row">
-            <label for="target-kcal">Daily kcal target</label>
-            <InputNumber id="target-kcal" @bind-Value="FormModel.DailyKcalTarget" />
+    <EditForm Model="FormModel" OnSubmit="SaveSettingsAsync" class="form">
+        <div class="form__row">
+            <label class="form__label" for="target-kcal">Daily kcal target</label>
+            <InputNumber id="target-kcal" class="form__control" @bind-Value="FormModel.DailyKcalTarget" />
         </div>
 
-        <div class="form-row">
-            <label for="target-protein">Daily protein target (g)</label>
-            <InputNumber id="target-protein" @bind-Value="FormModel.DailyProteinTargetG" />
+        <div class="form__row">
+            <label class="form__label" for="target-protein">Daily protein target (g)</label>
+            <InputNumber id="target-protein" class="form__control" @bind-Value="FormModel.DailyProteinTargetG" />
         </div>
 
-        <div class="form-row">
-            <label for="target-carbs">Daily carb target (g)</label>
-            <InputNumber id="target-carbs" @bind-Value="FormModel.DailyCarbTargetG" />
+        <div class="form__row">
+            <label class="form__label" for="target-carbs">Daily carb target (g)</label>
+            <InputNumber id="target-carbs" class="form__control" @bind-Value="FormModel.DailyCarbTargetG" />
         </div>
 
-        <div class="form-row">
-            <label for="target-fibre">Daily fibre target (g)</label>
-            <InputNumber id="target-fibre" @bind-Value="FormModel.DailyFibreTargetG" />
+        <div class="form__row">
+            <label class="form__label" for="target-fibre">Daily fibre target (g)</label>
+            <InputNumber id="target-fibre" class="form__control" @bind-Value="FormModel.DailyFibreTargetG" />
         </div>
 
-        <div class="form-row">
-            <label for="target-plants">Daily plant points target</label>
-            <InputNumber id="target-plants" @bind-Value="FormModel.DailyPlantsTarget" />
+        <div class="form__row">
+            <label class="form__label" for="target-plants">Daily plant points target</label>
+            <InputNumber id="target-plants" class="form__control" @bind-Value="FormModel.DailyPlantsTarget" />
         </div>
 
         @if (FormValidationErrors.Count > 0)
         {
-            <ul class="validation-message">
+            <ul class="form__errors">
                 @foreach (string validationError in FormValidationErrors)
                 {
                     <li>@validationError</li>
@@ -46,12 +46,12 @@ else
             </ul>
         }
 
-        <button type="submit" class="btn btn-primary">Save targets</button>
+        <button type="submit" class="btn btn--primary">Save targets</button>
     </EditForm>
 
     @if (SuccessMessage is not null)
     {
-        <div class="alert alert-success">@SuccessMessage</div>
+        <div class="alert alert--success">@SuccessMessage</div>
     }
 }
 

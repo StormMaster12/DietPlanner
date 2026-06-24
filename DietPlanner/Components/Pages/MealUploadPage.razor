@@ -10,7 +10,7 @@
     exist in the database updates that meal's macros instead of creating a duplicate.
 </p>
 
-<div class="form-row">
+<div class="form__row">
     <InputFile OnChange="OnFileSelectedAsync" accept=".csv" />
 </div>
 
@@ -21,7 +21,7 @@
 
 @if (ImportResult is not null)
 {
-    <div class="alert @(ImportResult.RowErrors.Count > 0 ? "alert-error" : "alert-success")">
+    <div class="alert @(ImportResult.RowErrors.Count > 0 ? "alert--error" : "alert--success")">
         <p>
             Inserted @ImportResult.InsertedCount new meal(s) and updated @ImportResult.UpdatedCount
             existing meal(s).

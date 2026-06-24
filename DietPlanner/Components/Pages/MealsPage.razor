@@ -4,11 +4,11 @@
 
 <p>All meals currently in the database, grouped by slot. Use this page to add, edit, or delete individual meals one at a time - to bulk-load many meals at once, use the <a href="meals/upload">Upload Meals</a> page instead.</p>
 
-<button class="btn btn-primary" @onclick="StartAddingNewMeal">Add a new meal</button>
+<button class="btn btn--primary" @onclick="StartAddingNewMeal">Add a new meal</button>
 
 @if (ErrorMessage is not null)
 {
-    <div class="alert alert-error">@ErrorMessage</div>
+    <div class="alert alert--error">@ErrorMessage</div>
 }
 
 @if (IsFormVisible)
@@ -16,15 +16,15 @@
     <section class="meal-form">
         <h2>@(IsEditingExistingMeal ? "Edit meal" : "Add meal")</h2>
 
-        <EditForm Model="FormModel" OnSubmit="SaveMealAsync" class="edit-form">
-            <div class="form-row">
-                <label for="meal-name">Name</label>
-                <InputText id="meal-name" @bind-Value="FormModel.Name" />
+        <EditForm Model="FormModel" OnSubmit="SaveMealAsync" class="form">
+            <div class="form__row">
+                <label class="form__label" for="meal-name">Name</label>
+                <InputText id="meal-name" class="form__control" @bind-Value="FormModel.Name" />
             </div>
 
-            <div class="form-row">
-                <label for="meal-slot">Slot</label>
-                <InputSelect id="meal-slot" @bind-Value="FormModel.SlotKey">
+            <div class="form__row">
+                <label class="form__label" for="meal-slot">Slot</label>
+                <InputSelect id="meal-slot" class="form__control" @bind-Value="FormModel.SlotKey">
                     @foreach (SlotDto slot in Slots ?? Enumerable.Empty<SlotDto>())
                     {
                         <option value="@slot.Key">@slot.DisplayName</option>
@@ -32,48 +32,48 @@
                 </InputSelect>
             </div>
 
-            <div class="form-row">
-                <label for="meal-kcal">Kcal</label>
-                <InputNumber id="meal-kcal" @bind-Value="FormModel.Kcal" />
+            <div class="form__row">
+                <label class="form__label" for="meal-kcal">Kcal</label>
+                <InputNumber id="meal-kcal" class="form__control" @bind-Value="FormModel.Kcal" />
             </div>
 
-            <div class="form-row">
-                <label for="meal-protein">Protein (g)</label>
-                <InputNumber id="meal-protein" @bind-Value="FormModel.ProteinG" />
+            <div class="form__row">
+                <label class="form__label" for="meal-protein">Protein (g)</label>
+                <InputNumber id="meal-protein" class="form__control" @bind-Value="FormModel.ProteinG" />
             </div>
 
-            <div class="form-row">
-                <label for="meal-carbs">Carbs (g)</label>
-                <InputNumber id="meal-carbs" @bind-Value="FormModel.CarbsG" />
+            <div class="form__row">
+                <label class="form__label" for="meal-carbs">Carbs (g)</label>
+                <InputNumber id="meal-carbs" class="form__control" @bind-Value="FormModel.CarbsG" />
             </div>
 
-            <div class="form-row">
-                <label for="meal-fibre">Fibre (g)</label>
-                <InputNumber id="meal-fibre" @bind-Value="FormModel.FibreG" />
+            <div class="form__row">
+                <label class="form__label" for="meal-fibre">Fibre (g)</label>
+                <InputNumber id="meal-fibre" class="form__control" @bind-Value="FormModel.FibreG" />
             </div>
 
-            <div class="form-row">
-                <label for="meal-plants">Plant points</label>
-                <InputNumber id="meal-plants" @bind-Value="FormModel.Plants" />
+            <div class="form__row">
+                <label class="form__label" for="meal-plants">Plant points</label>
+                <InputNumber id="meal-plants" class="form__control" @bind-Value="FormModel.Plants" />
             </div>
 
-            <div class="form-row">
-                <label for="meal-mfname">MyFitnessPal name</label>
-                <InputText id="meal-mfname" @bind-Value="FormModel.MfName" />
+            <div class="form__row">
+                <label class="form__label" for="meal-mfname">MyFitnessPal name</label>
+                <InputText id="meal-mfname" class="form__control" @bind-Value="FormModel.MfName" />
             </div>
 
-            <div class="form-row">
-                <label for="meal-zoe-notes">Zoe notes</label>
-                <InputTextArea id="meal-zoe-notes" @bind-Value="FormModel.ZoeNotes" />
+            <div class="form__row">
+                <label class="form__label" for="meal-zoe-notes">Zoe notes</label>
+                <InputTextArea id="meal-zoe-notes" class="form__control" @bind-Value="FormModel.ZoeNotes" />
             </div>
 
-            <div class="form-row">
-                <label for="meal-notes">Notes</label>
-                <InputTextArea id="meal-notes" @bind-Value="FormModel.Notes" />
+            <div class="form__row">
+                <label class="form__label" for="meal-notes">Notes</label>
+                <InputTextArea id="meal-notes" class="form__control" @bind-Value="FormModel.Notes" />
             </div>
 
             <h3>Ingredients</h3>
-            <table class="ingredients-table">
+            <table class="ingredient-table">
                 <thead>
                     <tr>
                         <th>Name</th>
@@ -86,19 +86,19 @@
                     @foreach (MealIngredientFormModel ingredient in FormModel.Ingredients)
                     {
                         <tr>
-                            <td><InputText @bind-Value="ingredient.Name" placeholder="e.g. Chicken breast" /></td>
-                            <td><InputNumber @bind-Value="ingredient.Quantity" /></td>
-                            <td><InputText @bind-Value="ingredient.Unit" placeholder="e.g. g" /></td>
-                            <td><button type="button" class="btn btn-secondary" @onclick="() => RemoveIngredientRow(ingredient)">Remove</button></td>
+                            <td><InputText class="ingredient-table__input" @bind-Value="ingredient.Name" placeholder="e.g. Chicken breast" /></td>
+                            <td><InputNumber class="ingredient-table__input" @bind-Value="ingredient.Quantity" /></td>
+                            <td><InputText class="ingredient-table__input" @bind-Value="ingredient.Unit" placeholder="e.g. g" /></td>
+                            <td><button type="button" class="btn btn--secondary" @onclick="() => RemoveIngredientRow(ingredient)">Remove</button></td>
                         </tr>
                     }
                 </tbody>
             </table>
-            <button type="button" class="btn btn-secondary" @onclick="AddIngredientRow">Add ingredient</button>
+            <button type="button" class="btn btn--secondary" @onclick="AddIngredientRow">Add ingredient</button>
 
             @if (FormValidationErrors.Count > 0)
             {
-                <ul class="validation-message">
+                <ul class="form__errors">
                     @foreach (string validationError in FormValidationErrors)
                     {
                         <li>@validationError</li>
@@ -106,8 +106,8 @@
                 </ul>
             }
 
-            <button type="submit" class="btn btn-primary">Save meal</button>
-            <button type="button" class="btn btn-secondary" @onclick="CancelEditing">Cancel</button>
+            <button type="submit" class="btn btn--primary">Save meal</button>
+            <button type="button" class="btn btn--secondary" @onclick="CancelEditing">Cancel</button>
         </EditForm>
     </section>
 }
@@ -122,17 +122,17 @@ else if (Meals.Count == 0)
 }
 else
 {
-    <table class="data-table">
+    <table class="table">
         <thead>
             <tr>
                 <th>Slot</th>
                 <th>Name</th>
                 <th>MyFitnessPal name</th>
-                <th class="numeric">Kcal</th>
-                <th class="numeric">Protein (g)</th>
-                <th class="numeric">Carbs (g)</th>
-                <th class="numeric">Fibre (g)</th>
-                <th class="numeric">Plants</th>
+                <th class="table__value--numeric">Kcal</th>
+                <th class="table__value--numeric">Protein (g)</th>
+                <th class="table__value--numeric">Carbs (g)</th>
+                <th class="table__value--numeric">Fibre (g)</th>
+                <th class="table__value--numeric">Plants</th>
                 <th>Ingredients</th>
                 <th></th>
             </tr>
@@ -144,40 +144,21 @@ else
                     <td>@meal.SlotKey</td>
                     <td>@meal.Name</td>
                     <td>@meal.MfName</td>
-                    <td class="numeric">@meal.Kcal</td>
-                    <td class="numeric">@meal.ProteinG</td>
-                    <td class="numeric">@meal.CarbsG</td>
-                    <td class="numeric">@meal.FibreG</td>
-                    <td class="numeric">@meal.Plants</td>
+                    <td class="table__value--numeric">@meal.Kcal</td>
+                    <td class="table__value--numeric">@meal.ProteinG</td>
+                    <td class="table__value--numeric">@meal.CarbsG</td>
+                    <td class="table__value--numeric">@meal.FibreG</td>
+                    <td class="table__value--numeric">@meal.Plants</td>
                     <td>@meal.Ingredients.Count</td>
                     <td>
-                        <button class="btn btn-secondary" @onclick="() => StartEditingMeal(meal)">Edit</button>
-                        <button class="btn btn-danger" @onclick="() => DeleteMealAsync(meal.MealId)">Delete</button>
+                        <button class="btn btn--secondary" @onclick="() => StartEditingMeal(meal)">Edit</button>
+                        <button class="btn btn--danger" @onclick="() => DeleteMealAsync(meal.MealId)">Delete</button>
                     </td>
                 </tr>
             }
         </tbody>
     </table>
 }
-
-<style>
-    .meal-form {
-        background-color: #ffffff;
-        border: 1px solid #e4e7eb;
-        border-radius: 0.4rem;
-        padding: 1rem 1.5rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .ingredients-table {
-        width: 100%;
-        margin-bottom: 0.75rem;
-    }
-
-    .ingredients-table input {
-        width: 100%;
-    }
-</style>
 
 @code {
     private List<MealDto>? Meals { get; set; }

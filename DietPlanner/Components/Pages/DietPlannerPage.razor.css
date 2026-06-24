@@ -1,0 +1,21 @@
+.week-plan__toolbar {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.week-plan__day {
+  margin-bottom: var(--space-8);
+}
+
+.shopping-list {
+  margin-bottom: var(--space-8);
+}
+.shopping-list__items {
+  margin-bottom: var(--space-3);
+}
+.shopping-list__copy-status {
+  margin-left: var(--space-3);
+  color: var(--color-success-text);
+}
+
+/*# sourceMappingURL=DietPlannerPage.razor.css.map */

@@ -1,30 +1,28 @@
-.nav-header {
-    font-size: 1.25rem;
-    font-weight: 700;
-    padding: 1.25rem 1rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+.nav__header {
+  font-size: 1.25rem;
+  font-weight: 700;
+  padding: var(--space-5) var(--space-4);
+  border-bottom: 1px solid var(--color-sidebar-border);
+}
+.nav__links {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-3) 0;
+}
+.nav__links ::deep .nav__link {
+  display: block;
+  padding: 0.6rem var(--space-5);
+  color: var(--color-sidebar-text);
+  text-decoration: none;
+}
+.nav__links ::deep .nav__link:hover {
+  background-color: var(--color-sidebar-link-hover-bg);
+  color: var(--color-sidebar-text-active);
+}
+.nav__links ::deep .nav__link--active {
+  background-color: var(--color-sidebar-link-active-bg);
+  color: var(--color-sidebar-text-active);
+  font-weight: 600;
 }
 
-.nav-links {
-    display: flex;
-    flex-direction: column;
-    padding: 0.75rem 0;
-}
-
-.nav-links ::deep a {
-    display: block;
-    padding: 0.6rem 1.25rem;
-    color: #c9d6e3;
-    text-decoration: none;
-}
-
-.nav-links ::deep a:hover {
-    background-color: rgba(255, 255, 255, 0.08);
-    color: #ffffff;
-}
-
-.nav-links ::deep a.active {
-    background-color: rgba(255, 255, 255, 0.15);
-    color: #ffffff;
-    font-weight: 600;
-}
+/*# sourceMappingURL=NavMenu.razor.css.map */

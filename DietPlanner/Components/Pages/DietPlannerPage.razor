@@ -7,22 +7,22 @@
     <strong>@WeekStartDate.AddDays(6).ToString("dddd d MMMM yyyy")</strong>.
 </p>
 
-<div class="week-toolbar">
-    <button class="btn btn-secondary" @onclick="GoToPreviousWeekAsync" disabled="@IsBusy">&laquo; Previous week</button>
-    <button class="btn btn-secondary" @onclick="GoToNextWeekAsync" disabled="@IsBusy">Next week &raquo;</button>
-    <button class="btn btn-primary" @onclick="GenerateWeekAsync" disabled="@IsBusy">
+<div class="week-plan__toolbar">
+    <button class="btn btn--secondary" @onclick="GoToPreviousWeekAsync" disabled="@IsBusy">&laquo; Previous week</button>
+    <button class="btn btn--secondary" @onclick="GoToNextWeekAsync" disabled="@IsBusy">Next week &raquo;</button>
+    <button class="btn btn--primary" @onclick="GenerateWeekAsync" disabled="@IsBusy">
         @(IsBusy ? "Generating..." : "Generate random week")
     </button>
 </div>
 
 @if (ErrorMessage is not null)
 {
-    <div class="alert alert-error">@ErrorMessage</div>
+    <div class="alert alert--error">@ErrorMessage</div>
 }
 
 @if (SuccessMessage is not null)
 {
-    <div class="alert alert-success">@SuccessMessage</div>
+    <div class="alert alert--success">@SuccessMessage</div>
 }
 
 @if (DayPlans is null)
@@ -33,19 +33,19 @@ else
 {
     @foreach (DayPlanResponseDto dayPlan in DayPlans)
     {
-        <section class="day-section">
+        <section class="week-plan__day">
             <h2>@dayPlan.Date.ToString("dddd d MMMM")</h2>
 
-            <table class="data-table">
+            <table class="table">
                 <thead>
                     <tr>
                         <th>Slot</th>
                         <th>Meal</th>
-                        <th class="numeric">Kcal</th>
-                        <th class="numeric">Protein (g)</th>
-                        <th class="numeric">Carbs (g)</th>
-                        <th class="numeric">Fibre (g)</th>
-                        <th class="numeric">Plants</th>
+                        <th class="table__value--numeric">Kcal</th>
+                        <th class="table__value--numeric">Protein (g)</th>
+                        <th class="table__value--numeric">Carbs (g)</th>
+                        <th class="table__value--numeric">Fibre (g)</th>
+                        <th class="table__value--numeric">Plants</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -54,37 +54,37 @@ else
                         <tr>
                             <td>@meal.SlotKey</td>
                             <td>@meal.Name</td>
-                            <td class="numeric">@meal.Kcal</td>
-                            <td class="numeric">@meal.ProteinG</td>
-                            <td class="numeric">@meal.CarbsG</td>
-                            <td class="numeric">@meal.FibreG</td>
-                            <td class="numeric">@meal.Plants</td>
+                            <td class="table__value--numeric">@meal.Kcal</td>
+                            <td class="table__value--numeric">@meal.ProteinG</td>
+                            <td class="table__value--numeric">@meal.CarbsG</td>
+                            <td class="table__value--numeric">@meal.FibreG</td>
+                            <td class="table__value--numeric">@meal.Plants</td>
                         </tr>
                     }
                 </tbody>
                 <tfoot>
                     <tr>
                         <td colspan="2"><strong>Total</strong></td>
-                        <td class="numeric">@dayPlan.Totals.Kcal</td>
-                        <td class="numeric">@dayPlan.Totals.ProteinG</td>
-                        <td class="numeric @CarbsCellCssClass(dayPlan)">@dayPlan.Totals.CarbsG</td>
-                        <td class="numeric">@dayPlan.Totals.FibreG</td>
-                        <td class="numeric">@dayPlan.Totals.Plants</td>
+                        <td class="table__value--numeric">@dayPlan.Totals.Kcal</td>
+                        <td class="table__value--numeric">@dayPlan.Totals.ProteinG</td>
+                        <td class="table__value--numeric @CarbsCellModifierClass(dayPlan)">@dayPlan.Totals.CarbsG</td>
+                        <td class="table__value--numeric">@dayPlan.Totals.FibreG</td>
+                        <td class="table__value--numeric">@dayPlan.Totals.Plants</td>
                     </tr>
                     <tr>
                         <td colspan="2"><strong>Remaining vs. target</strong></td>
-                        <td class="numeric">@dayPlan.Remaining.Kcal</td>
-                        <td class="numeric">@dayPlan.Remaining.ProteinG</td>
-                        <td class="numeric @CarbsCellCssClass(dayPlan)">@dayPlan.Remaining.CarbsG</td>
-                        <td class="numeric">@dayPlan.Remaining.FibreG</td>
-                        <td class="numeric">@dayPlan.Remaining.Plants</td>
+                        <td class="table__value--numeric">@dayPlan.Remaining.Kcal</td>
+                        <td class="table__value--numeric">@dayPlan.Remaining.ProteinG</td>
+                        <td class="table__value--numeric @CarbsCellModifierClass(dayPlan)">@dayPlan.Remaining.CarbsG</td>
+                        <td class="table__value--numeric">@dayPlan.Remaining.FibreG</td>
+                        <td class="table__value--numeric">@dayPlan.Remaining.Plants</td>
                     </tr>
                 </tfoot>
             </table>
         </section>
     }
 
-    <section class="shopping-list-section">
+    <section class="shopping-list">
         <h2>Weekly shopping list</h2>
         <p>Every ingredient needed for the meals planned this week, with quantities added together across all 7 days.</p>
 
@@ -94,46 +94,21 @@ else
         }
         else
         {
-            <ul class="shopping-list">
+            <ul class="shopping-list__items">
                 @foreach (DayPlanIngredientDto ingredient in WeeklyShoppingList)
                 {
-                    <li>@FormatIngredientLine(ingredient)</li>
+                    <li class="shopping-list__item">@FormatIngredientLine(ingredient)</li>
                 }
             </ul>
-            <button class="btn btn-secondary" @onclick="CopyShoppingListToClipboardAsync">Copy shopping list</button>
+            <button class="btn btn--secondary" @onclick="CopyShoppingListToClipboardAsync">Copy shopping list</button>
 
             @if (CopyStatusMessage is not null)
             {
-                <span class="copy-status">@CopyStatusMessage</span>
+                <span class="shopping-list__copy-status">@CopyStatusMessage</span>
             }
         }
     </section>
 }
-
-<style>
-    .week-toolbar {
-        display: flex;
-        gap: 0.75rem;
-        margin-bottom: 1rem;
-    }
-
-    .day-section {
-        margin-bottom: 2rem;
-    }
-
-    .shopping-list-section {
-        margin-bottom: 2rem;
-    }
-
-    .shopping-list {
-        margin-bottom: 0.75rem;
-    }
-
-    .copy-status {
-        margin-left: 0.75rem;
-        color: #2f7d32;
-    }
-</style>
 
 @code {
     /// <summary>The Monday that starts the week currently displayed on screen.</summary>
@@ -268,9 +243,11 @@ else
     }
 
     /// <summary>Highlights a day's carbohydrate total/remaining in red once it has gone over target.</summary>
-    private static string CarbsCellCssClass(DayPlanResponseDto dayPlan)
+    private static string CarbsCellModifierClass(DayPlanResponseDto dayPlan)
     {
-        return dayPlan.Totals.CarbsG > dayPlan.Targets.DailyCarbTargetG ? "over-target" : "under-target";
+        return dayPlan.Totals.CarbsG > dayPlan.Targets.DailyCarbTargetG
+            ? "table__value--over-target"
+            : "table__value--under-target";
     }
 
     /// <summary>Finds the Monday on or before <paramref name="date"/>.</summary>
