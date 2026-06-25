@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore DietPlanner.sln
+
+      - name: Build
+        run: dotnet build DietPlanner.sln --no-restore --configuration Release
+
+      - name: Run unit tests
+        run: dotnet test DietPlanner.Tests/DietPlanner.Tests.csproj --no-build --configuration Release --logger "console;verbosity=normal"
+
+      - name: Install Playwright browsers
+        run: |
+          dotnet build DietPlanner.E2ETests/DietPlanner.E2ETests.csproj --configuration Release
+          pwsh DietPlanner.E2ETests/bin/Release/net8.0/playwright.ps1 install --with-deps chromium
+
+      - name: Run Playwright e2e tests
+        run: dotnet test DietPlanner.E2ETests/DietPlanner.E2ETests.csproj --no-build --configuration Release --logger "console;verbosity=normal"

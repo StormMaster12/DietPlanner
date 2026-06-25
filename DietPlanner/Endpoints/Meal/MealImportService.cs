@@ -17,7 +17,14 @@ public sealed class MealImportService : IMealImportService
 
     public async Task<MealImportResult> ImportFromCsvAsync(Stream csvFileContent, CancellationToken cancellationToken)
     {
-        (List<MealImportRow> parsedRows, List<string> rowErrors) = ParseCsv(csvFileContent);
+        // CsvHelper reads its underlying stream synchronously, which the browser-backed stream
+        // from Blazor Server's InputFile doesn't support - buffer it into a seekable MemoryStream
+        // (via an async copy) first.
+        using MemoryStream bufferedContent = new();
+        await csvFileContent.CopyToAsync(bufferedContent, cancellationToken);
+        bufferedContent.Position = 0;
+
+        (List<MealImportRow> parsedRows, List<string> rowErrors) = ParseCsv(bufferedContent);
 
         int insertedCount = 0;
         int updatedCount = 0;
