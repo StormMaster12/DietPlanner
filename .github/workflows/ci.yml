@@ -25,9 +25,6 @@ jobs:
       - name: Run unit tests
         run: dotnet test DietPlanner.Tests/DietPlanner.Tests.csproj --no-build --configuration Release --logger "console;verbosity=normal"
 
-      - name: Build container image
-        run: docker build -t dietplanner-e2e:test .
-
       - name: Install Playwright browsers
         run: |
           dotnet build DietPlanner.E2ETests/DietPlanner.E2ETests.csproj --configuration Release
