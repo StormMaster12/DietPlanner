@@ -97,12 +97,8 @@ public sealed class DietPlannerAppFactory : IAsyncDisposable
         string requestJson = mappingJson.Replace("{{{body}}}", escapedBody);
 
         using HttpClient adminClient = _wireMockContainer.CreateClient();
-        using HttpRequestMessage request = new(HttpMethod.Post, $"{_wireMockContainer.GetPublicUrl()}/__admin/mappings")
-        {
-            Content = new StringContent(requestJson, Encoding.UTF8, "application/json")
-        };
-
-        using HttpResponseMessage response = await adminClient.SendAsync(request);
+        using HttpResponseMessage response = await adminClient.PostAsync(
+            "__admin/mappings", new StringContent(requestJson, Encoding.UTF8, "application/json"));
         response.EnsureSuccessStatusCode();
     }
 
