@@ -14,16 +14,16 @@ public abstract class PageTestBase : PageTest
     private DietPlannerAppFactory _factory = null!;
 
     [SetUp]
-    public void CreateAppFactory()
+    public async Task CreateAppFactoryAsync()
     {
         _factory = new DietPlannerAppFactory();
-        _factory.Start();
+        await _factory.StartAsync();
     }
 
     [TearDown]
-    public void DisposeAppFactory()
+    public async Task DisposeAppFactoryAsync()
     {
-        _factory.Dispose();
+        await _factory.DisposeAsync();
     }
 
     /// <summary>
