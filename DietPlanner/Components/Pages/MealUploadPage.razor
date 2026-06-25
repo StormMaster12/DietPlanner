@@ -11,7 +11,19 @@
 </p>
 
 <div class="form__row">
-    <InputFile OnChange="OnFileSelectedAsync" accept=".csv" />
+    <InputFile id="csv-file-input" OnChange="OnCsvFileSelectedAsync" accept=".csv" />
+</div>
+
+<h2>Or upload a PDF</h2>
+
+<p>
+    Upload a PDF (recipe sheet, meal plan, etc) and an AI model will read it and extract meals
+    automatically. Works best with PDFs whose text can be selected/copied (scanned image-only PDFs
+    won't have extractable text).
+</p>
+
+<div class="form__row">
+    <InputFile id="pdf-file-input" OnChange="OnPdfFileSelectedAsync" accept=".pdf" />
 </div>
 
 @if (IsUploading)
@@ -49,7 +61,10 @@
     [Inject]
     private IMealImportService MealImportService { get; set; } = null!;
 
-    private async Task OnFileSelectedAsync(InputFileChangeEventArgs changeEventArgs)
+    [Inject]
+    private IMealPdfImportService MealPdfImportService { get; set; } = null!;
+
+    private async Task OnCsvFileSelectedAsync(InputFileChangeEventArgs changeEventArgs)
     {
         IsUploading = true;
         ImportResult = null;
@@ -58,6 +73,22 @@
         {
             await using Stream uploadedFileStream = changeEventArgs.File.OpenReadStream(MaxUploadSizeBytes);
             ImportResult = await MealImportService.ImportFromCsvAsync(uploadedFileStream, CancellationToken.None);
+        }
+        finally
+        {
+            IsUploading = false;
+        }
+    }
+
+    private async Task OnPdfFileSelectedAsync(InputFileChangeEventArgs changeEventArgs)
+    {
+        IsUploading = true;
+        ImportResult = null;
+
+        try
+        {
+            await using Stream uploadedFileStream = changeEventArgs.File.OpenReadStream(MaxUploadSizeBytes);
+            ImportResult = await MealPdfImportService.ImportFromPdfAsync(uploadedFileStream, CancellationToken.None);
         }
         finally
         {

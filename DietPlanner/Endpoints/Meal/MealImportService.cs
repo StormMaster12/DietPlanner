@@ -2,7 +2,6 @@ using System.Globalization;
 using CsvHelper;
 using CsvHelper.Configuration;
 using DietPlanner.Endpoints.Slots;
-using Microsoft.EntityFrameworkCore;
 
 namespace DietPlanner.Endpoints.Meal;
 
@@ -26,50 +25,7 @@ public sealed class MealImportService : IMealImportService
 
         (List<MealImportRow> parsedRows, List<string> rowErrors) = ParseCsv(bufferedContent);
 
-        int insertedCount = 0;
-        int updatedCount = 0;
-
-        foreach (MealImportRow row in parsedRows)
-        {
-            MealEntry? existingMeal = await _db.Meals.SingleOrDefaultAsync(
-                m => m.SlotKey == row.SlotKey && m.Name.ToLower() == row.Name.ToLower(),
-                cancellationToken);
-
-            if (existingMeal is null)
-            {
-                _db.Meals.Add(new MealEntry
-                {
-                    Id = Guid.NewGuid(),
-                    Name = row.Name,
-                    SlotKey = row.SlotKey,
-                    Kcal = row.Kcal,
-                    ProteinG = row.ProteinG,
-                    CarbsG = row.CarbsG,
-                    FibreG = row.FibreG,
-                    Plants = row.Plants,
-                    MfName = row.MfName,
-                    ZoeNotes = row.ZoeNotes,
-                    Notes = row.Notes
-                });
-                insertedCount++;
-            }
-            else
-            {
-                existingMeal.Kcal = row.Kcal;
-                existingMeal.ProteinG = row.ProteinG;
-                existingMeal.CarbsG = row.CarbsG;
-                existingMeal.FibreG = row.FibreG;
-                existingMeal.Plants = row.Plants;
-                existingMeal.MfName = row.MfName;
-                existingMeal.ZoeNotes = row.ZoeNotes;
-                existingMeal.Notes = row.Notes;
-                updatedCount++;
-            }
-        }
-
-        await _db.SaveChangesAsync(cancellationToken);
-
-        return new MealImportResult(insertedCount, updatedCount, rowErrors);
+        return await MealImportUpsert.UpsertRowsAsync(_db, parsedRows, rowErrors, cancellationToken);
     }
 
     /// <summary>

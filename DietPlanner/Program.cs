@@ -37,6 +37,9 @@ services.AddScoped<ISettingsService, SettingsService>()
     .AddScoped<IMealImportService, MealImportService>()
     .AddScoped<ISlotsService, SlotsService>();
 
+services.Configure<AnthropicOptions>(builder.Configuration.GetSection(AnthropicOptions.SectionName));
+services.AddHttpClient<IMealPdfImportService, MealPdfImportService>();
+
 services.AddValidatorsFromAssemblyContaining<Program>();
 services.AddDbContext<AppDbContext>(opt =>
     opt.UseSqlite(builder.Configuration.GetConnectionString("Db")));

@@ -16,6 +16,7 @@ public static class MealsEndpoints
         group.MapGet("/{mealId}", GetMealAsync).WithOpenApi();
         group.MapPut("/", UpsertMealAsync).WithOpenApi();
         group.MapDelete("/{mealId}", DeleteMealAsync).WithOpenApi();
+        group.MapPost("/import-pdf", ImportMealsFromPdfAsync).WithOpenApi().DisableAntiforgery();
 
         return endpoints;
     }
@@ -55,5 +56,18 @@ public static class MealsEndpoints
             DeleteResult.Success => TypedResults.NoContent(),
             _ => throw new NotImplementedException()
         };
+    }
+
+    public static async Task<Results<Ok<MealImportResult>, BadRequest<string>>> ImportMealsFromPdfAsync(
+        IFormFile file, [FromServices] IMealPdfImportService mealPdfImportService, CancellationToken cancellationToken)
+    {
+        if (file.Length == 0)
+        {
+            return TypedResults.BadRequest("Uploaded file is empty.");
+        }
+
+        await using Stream pdfFileStream = file.OpenReadStream();
+        MealImportResult result = await mealPdfImportService.ImportFromPdfAsync(pdfFileStream, cancellationToken);
+        return TypedResults.Ok(result);
     }
 }

@@ -15,7 +15,7 @@ public sealed class MealUploadPageTests : PageTestBase
                      "Oatmeal,Breakfast,300,10,40,5,2,Oatmeal MFP,Good fibre,\n";
         byte[] csvBytes = System.Text.Encoding.UTF8.GetBytes(csv);
 
-        await Page.SetInputFilesAsync("input[type=file]", new FilePayload
+        await Page.SetInputFilesAsync("#csv-file-input", new FilePayload
         {
             Name = "meals.csv",
             MimeType = "text/csv",
@@ -34,7 +34,7 @@ public sealed class MealUploadPageTests : PageTestBase
                      "Oatmeal,Brunch,300,10,40,5,2,Oatmeal MFP,,\n";
         byte[] csvBytes = System.Text.Encoding.UTF8.GetBytes(csv);
 
-        await Page.SetInputFilesAsync("input[type=file]", new FilePayload
+        await Page.SetInputFilesAsync("#csv-file-input", new FilePayload
         {
             Name = "meals.csv",
             MimeType = "text/csv",
