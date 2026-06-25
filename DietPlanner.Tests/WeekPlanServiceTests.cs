@@ -1,15 +1,24 @@
 using DietPlanner.Endpoints.Meal;
 using DietPlanner.Endpoints.Slots;
 using DietPlanner.Endpoints.WeekPlan;
-using FluentAssertions;
-using Xunit;
 
 namespace DietPlanner.Tests;
 
-public sealed class WeekPlanServiceTests : IDisposable
+[TestFixture]
+public sealed class WeekPlanServiceTests
 {
-    private readonly TestDatabase _database = new();
-    private readonly Guid _mealId = Guid.NewGuid();
+    private TestDatabase _database = null!;
+    private Guid _mealId;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _database = new TestDatabase();
+        _mealId = Guid.NewGuid();
+    }
+
+    [TearDown]
+    public void TearDown() => _database.Dispose();
 
     private async Task SeedSlotAndMealAsync()
     {
@@ -30,7 +39,7 @@ public sealed class WeekPlanServiceTests : IDisposable
         await db.SaveChangesAsync();
     }
 
-    [Fact]
+    [Test]
     public async Task UpsertEntryAsync_WithUnknownSlot_ReturnsInvalidSlot()
     {
         await SeedSlotAndMealAsync();
@@ -41,11 +50,11 @@ public sealed class WeekPlanServiceTests : IDisposable
             new UpsertWeekEntryRequest(new DateOnly(2026, 1, 5), SlotKey.Lunch, _mealId, 1m, null),
             CancellationToken.None);
 
-        result.Should().Be(UpsertWeekEntryResult.InvalidSlot);
-        entry.Should().BeNull();
+        Assert.That(result, Is.EqualTo(UpsertWeekEntryResult.InvalidSlot));
+        Assert.That(entry, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public async Task UpsertEntryAsync_WithUnknownMeal_ReturnsUnknownMeal()
     {
         await SeedSlotAndMealAsync();
@@ -56,11 +65,11 @@ public sealed class WeekPlanServiceTests : IDisposable
             new UpsertWeekEntryRequest(new DateOnly(2026, 1, 5), SlotKey.Breakfast, Guid.NewGuid(), 1m, null),
             CancellationToken.None);
 
-        result.Should().Be(UpsertWeekEntryResult.UnknownMeal);
-        entry.Should().BeNull();
+        Assert.That(result, Is.EqualTo(UpsertWeekEntryResult.UnknownMeal));
+        Assert.That(entry, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public async Task UpsertEntryAsync_WithNewEntry_CreatesEntry()
     {
         await SeedSlotAndMealAsync();
@@ -72,11 +81,11 @@ public sealed class WeekPlanServiceTests : IDisposable
             new UpsertWeekEntryRequest(date, SlotKey.Breakfast, _mealId, 1.5m, "extra hungry"),
             CancellationToken.None);
 
-        result.Should().Be(UpsertWeekEntryResult.Success);
-        entry.Should().Be(new WeekPlanEntryDto(date, SlotKey.Breakfast, _mealId, 1.5m, "extra hungry"));
+        Assert.That(result, Is.EqualTo(UpsertWeekEntryResult.Success));
+        Assert.That(entry, Is.EqualTo(new WeekPlanEntryDto(date, SlotKey.Breakfast, _mealId, 1.5m, "extra hungry")));
     }
 
-    [Fact]
+    [Test]
     public async Task UpsertEntryAsync_CalledTwiceForSameSlot_UpdatesExistingEntry()
     {
         // Regression test: the previous implementation reassigned a `record with` expression to a
@@ -99,29 +108,30 @@ public sealed class WeekPlanServiceTests : IDisposable
             new UpsertWeekEntryRequest(date, SlotKey.Breakfast, _mealId, 2m, "second"),
             CancellationToken.None);
 
-        result.Should().Be(UpsertWeekEntryResult.Success);
-        entry.Should().Be(new WeekPlanEntryDto(date, SlotKey.Breakfast, _mealId, 2m, "second"));
+        Assert.That(result, Is.EqualTo(UpsertWeekEntryResult.Success));
+        Assert.That(entry, Is.EqualTo(new WeekPlanEntryDto(date, SlotKey.Breakfast, _mealId, 2m, "second")));
 
         IReadOnlyList<WeekPlanEntryDto> all = await service.GetWeekAsync(date, date, CancellationToken.None);
-        all.Should().ContainSingle().Which.Should().Be(entry);
+        Assert.That(all, Has.Count.EqualTo(1));
+        Assert.That(all.Single(), Is.EqualTo(entry));
     }
 
-    [Fact]
-    public async Task SetWeekAsync_WithTooFewOrTooManyEntries_Throws()
+    [Test]
+    public void SetWeekAsync_WithTooFewOrTooManyEntries_Throws()
     {
         using AppDbContext db = _database.CreateContext();
         WeekPlanService service = new(db);
 
-        Func<Task> tooFew = () => service.SetWeekAsync(Array.Empty<UpsertWeekEntryRequest>(), CancellationToken.None);
-        Func<Task> tooMany = () => service.SetWeekAsync(
-            Enumerable.Range(0, 29).Select(i => new UpsertWeekEntryRequest(new DateOnly(2026, 1, 1).AddDays(i), SlotKey.Breakfast, _mealId, 1m, null)).ToList(),
-            CancellationToken.None);
+        Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () =>
+            await service.SetWeekAsync(Array.Empty<UpsertWeekEntryRequest>(), CancellationToken.None));
 
-        await tooFew.Should().ThrowAsync<ArgumentOutOfRangeException>();
-        await tooMany.Should().ThrowAsync<ArgumentOutOfRangeException>();
+        Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () =>
+            await service.SetWeekAsync(
+                Enumerable.Range(0, 29).Select(i => new UpsertWeekEntryRequest(new DateOnly(2026, 1, 1).AddDays(i), SlotKey.Breakfast, _mealId, 1m, null)).ToList(),
+                CancellationToken.None));
     }
 
-    [Fact]
+    [Test]
     public async Task SetWeekAsync_WithValidEntries_CreatesAndUpdatesAsAppropriate()
     {
         await SeedSlotAndMealAsync();
@@ -145,15 +155,15 @@ public sealed class WeekPlanServiceTests : IDisposable
             },
             CancellationToken.None);
 
-        result.Should().Be(UpsertWeekEntryResult.Success);
-        count.Should().Be(2);
+        Assert.That(result, Is.EqualTo(UpsertWeekEntryResult.Success));
+        Assert.That(count, Is.EqualTo(2));
 
         IReadOnlyList<WeekPlanEntryDto> all = await service.GetWeekAsync(date, date.AddDays(1), CancellationToken.None);
-        all.Should().HaveCount(2);
-        all.Should().Contain(e => e.Date == date && e.PortionMultiplier == 3m && e.Notes == "updated");
+        Assert.That(all, Has.Count.EqualTo(2));
+        Assert.That(all.Any(e => e.Date == date && e.PortionMultiplier == 3m && e.Notes == "updated"), Is.True);
     }
 
-    [Fact]
+    [Test]
     public async Task SetWeekAsync_WithUnknownMeal_ReturnsUnknownMealWithoutPersistingValidEntries()
     {
         await SeedSlotAndMealAsync();
@@ -169,11 +179,11 @@ public sealed class WeekPlanServiceTests : IDisposable
             },
             CancellationToken.None);
 
-        result.Should().Be(UpsertWeekEntryResult.UnknownMeal);
-        count.Should().Be(0);
+        Assert.That(result, Is.EqualTo(UpsertWeekEntryResult.UnknownMeal));
+        Assert.That(count, Is.EqualTo(0));
     }
 
-    [Fact]
+    [Test]
     public async Task DeleteEntryAsync_WithExistingEntry_RemovesIt()
     {
         await SeedSlotAndMealAsync();
@@ -184,11 +194,11 @@ public sealed class WeekPlanServiceTests : IDisposable
 
         DeleteResult result = await service.DeleteEntryAsync(date, SlotKey.Breakfast, CancellationToken.None);
 
-        result.Should().Be(DeleteResult.Success);
-        (await service.GetWeekAsync(date, date, CancellationToken.None)).Should().BeEmpty();
+        Assert.That(result, Is.EqualTo(DeleteResult.Success));
+        Assert.That(await service.GetWeekAsync(date, date, CancellationToken.None), Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public async Task DeleteEntryAsync_WithUnknownEntry_ReturnsNotFound()
     {
         using AppDbContext db = _database.CreateContext();
@@ -196,8 +206,7 @@ public sealed class WeekPlanServiceTests : IDisposable
 
         DeleteResult result = await service.DeleteEntryAsync(new DateOnly(2026, 1, 5), SlotKey.Breakfast, CancellationToken.None);
 
-        result.Should().Be(DeleteResult.NotFound);
+        Assert.That(result, Is.EqualTo(DeleteResult.NotFound));
     }
 
-    public void Dispose() => _database.Dispose();
 }

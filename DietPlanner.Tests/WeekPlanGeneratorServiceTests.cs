@@ -2,14 +2,19 @@ using DietPlanner.Endpoints.Meal;
 using DietPlanner.Endpoints.Settings;
 using DietPlanner.Endpoints.Slots;
 using DietPlanner.Endpoints.WeekPlan;
-using FluentAssertions;
-using Xunit;
 
 namespace DietPlanner.Tests;
 
-public sealed class WeekPlanGeneratorServiceTests : IDisposable
+[TestFixture]
+public sealed class WeekPlanGeneratorServiceTests
 {
-    private readonly TestDatabase _database = new();
+    private TestDatabase _database = null!;
+
+    [SetUp]
+    public void SetUp() => _database = new TestDatabase();
+
+    [TearDown]
+    public void TearDown() => _database.Dispose();
 
     private static MealEntry NewMeal(SlotKey slot, string name, int carbs = 40, int protein = 20) => new()
     {
@@ -33,7 +38,7 @@ public sealed class WeekPlanGeneratorServiceTests : IDisposable
         await db.SaveChangesAsync();
     }
 
-    [Fact]
+    [Test]
     public async Task GenerateWeekAsync_WithNoMealsForASlot_ReturnsNoMealsAvailableForSlot()
     {
         using AppDbContext db = _database.CreateContext();
@@ -47,12 +52,12 @@ public sealed class WeekPlanGeneratorServiceTests : IDisposable
             new GenerateWeekPlanRequest(new DateOnly(2026, 1, 5)),
             CancellationToken.None);
 
-        result.Should().Be(GenerateWeekPlanResult.NoMealsAvailableForSlot);
-        missingSlot.Should().Be(SlotKey.Lunch);
-        entries.Should().BeEmpty();
+        Assert.That(result, Is.EqualTo(GenerateWeekPlanResult.NoMealsAvailableForSlot));
+        Assert.That(missingSlot, Is.EqualTo(SlotKey.Lunch));
+        Assert.That(entries, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public async Task GenerateWeekAsync_WithMealsForEverySlot_FillsAllSevenDaysAndEverySlot()
     {
         using AppDbContext db = _database.CreateContext();
@@ -70,18 +75,19 @@ public sealed class WeekPlanGeneratorServiceTests : IDisposable
             new GenerateWeekPlanRequest(weekStart),
             CancellationToken.None);
 
-        result.Should().Be(GenerateWeekPlanResult.Success);
-        missingSlot.Should().BeNull();
-        entries.Should().HaveCount(7 * Enum.GetValues<SlotKey>().Length);
-        entries.Select(e => e.Date).Distinct().Should().HaveCount(7);
+        Assert.That(result, Is.EqualTo(GenerateWeekPlanResult.Success));
+        Assert.That(missingSlot, Is.Null);
+        Assert.That(entries, Has.Count.EqualTo(7 * Enum.GetValues<SlotKey>().Length));
+        Assert.That(entries.Select(e => e.Date).Distinct().Count(), Is.EqualTo(7));
         foreach (DateOnly date in Enumerable.Range(0, 7).Select(weekStart.AddDays))
         {
-            entries.Where(e => e.Date == date).Select(e => e.SlotKey).Should()
-                .BeEquivalentTo(Enum.GetValues<SlotKey>());
+            Assert.That(
+                entries.Where(e => e.Date == date).Select(e => e.SlotKey),
+                Is.EquivalentTo(Enum.GetValues<SlotKey>()));
         }
     }
 
-    [Fact]
+    [Test]
     public async Task GenerateWeekAsync_CalledTwiceForSameWeek_ReplacesPreviousEntries()
     {
         using AppDbContext db = _database.CreateContext();
@@ -101,8 +107,7 @@ public sealed class WeekPlanGeneratorServiceTests : IDisposable
         WeekPlanService weekPlanService = new(db);
         IReadOnlyList<WeekPlanEntryDto> stored = await weekPlanService.GetWeekAsync(weekStart, weekStart.AddDays(6), CancellationToken.None);
 
-        stored.Should().HaveCount(secondEntries.Count);
+        Assert.That(stored, Has.Count.EqualTo(secondEntries.Count));
     }
 
-    public void Dispose() => _database.Dispose();
 }

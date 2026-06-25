@@ -3,16 +3,21 @@ using DietPlanner.Endpoints.Meal;
 using DietPlanner.Endpoints.Settings;
 using DietPlanner.Endpoints.Slots;
 using DietPlanner.Endpoints.WeekPlan;
-using FluentAssertions;
-using Xunit;
 
 namespace DietPlanner.Tests;
 
-public sealed class DayPlanServiceTests : IDisposable
+[TestFixture]
+public sealed class DayPlanServiceTests
 {
-    private readonly TestDatabase _database = new();
+    private TestDatabase _database = null!;
 
-    [Fact]
+    [SetUp]
+    public void SetUp() => _database = new TestDatabase();
+
+    [TearDown]
+    public void TearDown() => _database.Dispose();
+
+    [Test]
     public async Task GetDayPlanAsync_WithNoEntries_ReturnsZeroTotalsAndDefaultTargetsAsRemaining()
     {
         using AppDbContext db = _database.CreateContext();
@@ -21,13 +26,13 @@ public sealed class DayPlanServiceTests : IDisposable
 
         DayPlanResponseDto result = await service.GetDayPlanAsync(date, CancellationToken.None);
 
-        result.Date.Should().Be(date);
-        result.Meals.Should().BeEmpty();
-        result.Totals.Should().Be(new DayPlanTotalsDto(0, 0, 0, 0, 0));
-        result.Remaining.Should().Be(new DayPlanTotalsDto(2300, 165, 220, 30, 30));
+        Assert.That(result.Date, Is.EqualTo(date));
+        Assert.That(result.Meals, Is.Empty);
+        Assert.That(result.Totals, Is.EqualTo(new DayPlanTotalsDto(0, 0, 0, 0, 0)));
+        Assert.That(result.Remaining, Is.EqualTo(new DayPlanTotalsDto(2300, 165, 220, 30, 30)));
     }
 
-    [Fact]
+    [Test]
     public async Task GetDayPlanAsync_ScalesIngredientsAndMacrosByPortionMultiplier()
     {
         Guid mealId = Guid.NewGuid();
@@ -61,17 +66,18 @@ public sealed class DayPlanServiceTests : IDisposable
 
         DayPlanResponseDto result = await service.GetDayPlanAsync(date, CancellationToken.None);
 
-        DayPlanMealDto meal = result.Meals.Should().ContainSingle().Subject;
-        meal.Kcal.Should().Be(400);
-        meal.ProteinG.Should().Be(20);
-        meal.CarbsG.Should().Be(60);
-        meal.Ingredients.Should().ContainSingle(i => i.Name == "Oats" && i.Quantity == 100);
+        Assert.That(result.Meals, Has.Count.EqualTo(1));
+        DayPlanMealDto meal = result.Meals.Single();
+        Assert.That(meal.Kcal, Is.EqualTo(400));
+        Assert.That(meal.ProteinG, Is.EqualTo(20));
+        Assert.That(meal.CarbsG, Is.EqualTo(60));
+        Assert.That(meal.Ingredients.Count(i => i.Name == "Oats" && i.Quantity == 100), Is.EqualTo(1));
 
-        result.Totals.Should().Be(new DayPlanTotalsDto(400, 20, 60, 8, 2));
-        result.Remaining.Should().Be(new DayPlanTotalsDto(2300 - 400, 165 - 20, 220 - 60, 30 - 8, 30 - 2));
+        Assert.That(result.Totals, Is.EqualTo(new DayPlanTotalsDto(400, 20, 60, 8, 2)));
+        Assert.That(result.Remaining, Is.EqualTo(new DayPlanTotalsDto(2300 - 400, 165 - 20, 220 - 60, 30 - 8, 30 - 2)));
     }
 
-    [Fact]
+    [Test]
     public async Task GetDayPlanAsync_OrdersMealsBySlotSortOrder()
     {
         Guid breakfastMealId = Guid.NewGuid();
@@ -94,8 +100,7 @@ public sealed class DayPlanServiceTests : IDisposable
 
         DayPlanResponseDto result = await service.GetDayPlanAsync(date, CancellationToken.None);
 
-        result.Meals.Select(m => m.SlotKey).Should().ContainInOrder(SlotKey.Breakfast, SlotKey.Dinner);
+        Assert.That(result.Meals.Select(m => m.SlotKey), Is.EqualTo(new[] { SlotKey.Breakfast, SlotKey.Dinner }));
     }
 
-    public void Dispose() => _database.Dispose();
 }

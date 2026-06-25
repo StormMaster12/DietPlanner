@@ -1,13 +1,18 @@
 using DietPlanner.Endpoints.Meal;
 using DietPlanner.Endpoints.Slots;
-using FluentAssertions;
-using Xunit;
 
 namespace DietPlanner.Tests;
 
-public sealed class MealsServiceTests : IDisposable
+[TestFixture]
+public sealed class MealsServiceTests
 {
-    private readonly TestDatabase _database = new();
+    private TestDatabase _database = null!;
+
+    [SetUp]
+    public void SetUp() => _database = new TestDatabase();
+
+    [TearDown]
+    public void TearDown() => _database.Dispose();
 
     private async Task SeedBreakfastSlotAsync()
     {
@@ -30,7 +35,7 @@ public sealed class MealsServiceTests : IDisposable
         Notes: "Add cinnamon",
         Ingredients: new List<UpsertMealIngredientRequest> { new("Oats", 80, "g") });
 
-    [Fact]
+    [Test]
     public async Task UpsertMealAsync_WithUnknownSlot_ReturnsInvalidSlot()
     {
         using AppDbContext db = _database.CreateContext();
@@ -38,11 +43,11 @@ public sealed class MealsServiceTests : IDisposable
 
         var (result, meal) = await service.UpsertMealAsync(NewMealRequest(), CancellationToken.None);
 
-        result.Should().Be(UpsertMealResult.InvalidSlot);
-        meal.Should().BeNull();
+        Assert.That(result, Is.EqualTo(UpsertMealResult.InvalidSlot));
+        Assert.That(meal, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public async Task UpsertMealAsync_WithNewMealId_CreatesMealWithIngredients()
     {
         await SeedBreakfastSlotAsync();
@@ -51,12 +56,12 @@ public sealed class MealsServiceTests : IDisposable
 
         var (result, meal) = await service.UpsertMealAsync(NewMealRequest(), CancellationToken.None);
 
-        result.Should().Be(UpsertMealResult.Success);
-        meal!.Name.Should().Be("Oatmeal");
-        meal.Ingredients.Should().ContainSingle(i => i.Name == "Oats" && i.Quantity == 80);
+        Assert.That(result, Is.EqualTo(UpsertMealResult.Success));
+        Assert.That(meal!.Name, Is.EqualTo("Oatmeal"));
+        Assert.That(meal.Ingredients.Count(i => i.Name == "Oats" && i.Quantity == 80), Is.EqualTo(1));
     }
 
-    [Fact]
+    [Test]
     public async Task UpsertMealAsync_TrimsNameAndIngredientFields()
     {
         await SeedBreakfastSlotAsync();
@@ -70,12 +75,12 @@ public sealed class MealsServiceTests : IDisposable
 
         var (_, meal) = await service.UpsertMealAsync(request, CancellationToken.None);
 
-        meal!.Name.Should().Be("Oatmeal");
-        meal.Ingredients.Single().Name.Should().Be("Oats");
-        meal.Ingredients.Single().Unit.Should().Be("g");
+        Assert.That(meal!.Name, Is.EqualTo("Oatmeal"));
+        Assert.That(meal.Ingredients.Single().Name, Is.EqualTo("Oats"));
+        Assert.That(meal.Ingredients.Single().Unit, Is.EqualTo("g"));
     }
 
-    [Fact]
+    [Test]
     public async Task UpsertMealAsync_WithExistingMealId_UpdatesFieldsAndReplacesIngredients()
     {
         await SeedBreakfastSlotAsync();
@@ -97,15 +102,15 @@ public sealed class MealsServiceTests : IDisposable
 
         var (result, meal) = await service.UpsertMealAsync(updateRequest, CancellationToken.None);
 
-        result.Should().Be(UpsertMealResult.Success);
-        meal!.Name.Should().Be("Porridge");
-        meal.Kcal.Should().Be(350);
-        meal.Ingredients.Should().HaveCount(2);
-        meal.Ingredients.Should().Contain(i => i.Name == "Porridge oats");
-        meal.Ingredients.Should().Contain(i => i.Name == "Milk");
+        Assert.That(result, Is.EqualTo(UpsertMealResult.Success));
+        Assert.That(meal!.Name, Is.EqualTo("Porridge"));
+        Assert.That(meal.Kcal, Is.EqualTo(350));
+        Assert.That(meal.Ingredients, Has.Count.EqualTo(2));
+        Assert.That(meal.Ingredients.Any(i => i.Name == "Porridge oats"), Is.True);
+        Assert.That(meal.Ingredients.Any(i => i.Name == "Milk"), Is.True);
     }
 
-    [Fact]
+    [Test]
     public async Task UpsertMealAsync_UpdateDoesNotThrowConcurrencyException_AcrossFreshContexts()
     {
         // Regression coverage for the ingredient-replacement approach: re-adding new ingredient
@@ -120,14 +125,13 @@ public sealed class MealsServiceTests : IDisposable
         }
 
         using AppDbContext db2 = _database.CreateContext();
-        Func<Task> act = async () => await new MealsService(db2).UpsertMealAsync(
-            NewMealRequest(mealId) with { Ingredients = new List<UpsertMealIngredientRequest> { new("New ingredient", 1, null) } },
-            CancellationToken.None);
 
-        await act.Should().NotThrowAsync();
+        Assert.DoesNotThrowAsync(async () => await new MealsService(db2).UpsertMealAsync(
+            NewMealRequest(mealId) with { Ingredients = new List<UpsertMealIngredientRequest> { new("New ingredient", 1, null) } },
+            CancellationToken.None));
     }
 
-    [Fact]
+    [Test]
     public async Task GetMealsAsync_ReturnsAllMealsWithIngredients()
     {
         await SeedBreakfastSlotAsync();
@@ -138,11 +142,11 @@ public sealed class MealsServiceTests : IDisposable
 
         IReadOnlyList<MealDto> meals = await service.GetMealsAsync(CancellationToken.None);
 
-        meals.Should().HaveCount(2);
-        meals.Should().Contain(m => m.Name == "Oatmeal" && m.Ingredients.Count == 1);
+        Assert.That(meals, Has.Count.EqualTo(2));
+        Assert.That(meals.Any(m => m.Name == "Oatmeal" && m.Ingredients.Count == 1), Is.True);
     }
 
-    [Fact]
+    [Test]
     public async Task GetMealAsync_WithUnknownId_ReturnsNull()
     {
         using AppDbContext db = _database.CreateContext();
@@ -150,10 +154,10 @@ public sealed class MealsServiceTests : IDisposable
 
         MealDto? result = await service.GetMealAsync(Guid.NewGuid(), CancellationToken.None);
 
-        result.Should().BeNull();
+        Assert.That(result, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public async Task DeleteMealAsync_WithExistingMeal_RemovesMeal()
     {
         await SeedBreakfastSlotAsync();
@@ -163,11 +167,11 @@ public sealed class MealsServiceTests : IDisposable
 
         DeleteResult result = await service.DeleteMealAsync(meal!.MealId, CancellationToken.None);
 
-        result.Should().Be(DeleteResult.Success);
-        (await service.GetMealsAsync(CancellationToken.None)).Should().BeEmpty();
+        Assert.That(result, Is.EqualTo(DeleteResult.Success));
+        Assert.That(await service.GetMealsAsync(CancellationToken.None), Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public async Task DeleteMealAsync_WithUnknownId_ReturnsNotFound()
     {
         using AppDbContext db = _database.CreateContext();
@@ -175,8 +179,7 @@ public sealed class MealsServiceTests : IDisposable
 
         DeleteResult result = await service.DeleteMealAsync(Guid.NewGuid(), CancellationToken.None);
 
-        result.Should().Be(DeleteResult.NotFound);
+        Assert.That(result, Is.EqualTo(DeleteResult.NotFound));
     }
 
-    public void Dispose() => _database.Dispose();
 }

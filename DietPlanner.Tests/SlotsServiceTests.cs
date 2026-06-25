@@ -1,14 +1,19 @@
 using DietPlanner.Endpoints.Slots;
-using FluentAssertions;
-using Xunit;
 
 namespace DietPlanner.Tests;
 
-public sealed class SlotsServiceTests : IDisposable
+[TestFixture]
+public sealed class SlotsServiceTests
 {
-    private readonly TestDatabase _database = new();
+    private TestDatabase _database = null!;
 
-    [Fact]
+    [SetUp]
+    public void SetUp() => _database = new TestDatabase();
+
+    [TearDown]
+    public void TearDown() => _database.Dispose();
+
+    [Test]
     public async Task CreateSlotAsync_WithNewKey_CreatesSlot()
     {
         using AppDbContext db = _database.CreateContext();
@@ -16,10 +21,10 @@ public sealed class SlotsServiceTests : IDisposable
 
         SlotDto? result = await service.CreateSlotAsync(new CreateSlotRequest(SlotKey.Breakfast, "Breakfast", 1), CancellationToken.None);
 
-        result.Should().Be(new SlotDto("Breakfast", 1, SlotKey.Breakfast));
+        Assert.That(result, Is.EqualTo(new SlotDto("Breakfast", 1, SlotKey.Breakfast)));
     }
 
-    [Fact]
+    [Test]
     public async Task CreateSlotAsync_TrimsDisplayName()
     {
         using AppDbContext db = _database.CreateContext();
@@ -27,10 +32,10 @@ public sealed class SlotsServiceTests : IDisposable
 
         SlotDto? result = await service.CreateSlotAsync(new CreateSlotRequest(SlotKey.Lunch, "  Lunch  ", 2), CancellationToken.None);
 
-        result!.DisplayName.Should().Be("Lunch");
+        Assert.That(result!.DisplayName, Is.EqualTo("Lunch"));
     }
 
-    [Fact]
+    [Test]
     public async Task CreateSlotAsync_WithExistingKey_ReturnsNull()
     {
         using AppDbContext db = _database.CreateContext();
@@ -39,10 +44,10 @@ public sealed class SlotsServiceTests : IDisposable
 
         SlotDto? result = await service.CreateSlotAsync(new CreateSlotRequest(SlotKey.Dinner, "Dinner Take 2", 99), CancellationToken.None);
 
-        result.Should().BeNull();
+        Assert.That(result, Is.Null);
     }
 
-    [Fact]
+    [Test]
     public async Task GetSlotsAsync_ReturnsSlotsOrderedBySortOrder()
     {
         using AppDbContext db = _database.CreateContext();
@@ -53,10 +58,10 @@ public sealed class SlotsServiceTests : IDisposable
 
         List<SlotDto> result = (await service.GetSlotsAsync(CancellationToken.None)).ToList();
 
-        result.Select(s => s.Key).Should().ContainInOrder(SlotKey.Breakfast, SlotKey.Lunch, SlotKey.Dinner);
+        Assert.That(result.Select(s => s.Key), Is.EqualTo(new[] { SlotKey.Breakfast, SlotKey.Lunch, SlotKey.Dinner }));
     }
 
-    [Fact]
+    [Test]
     public async Task DeleteSlotAsync_WithExistingKey_RemovesSlot()
     {
         using AppDbContext db = _database.CreateContext();
@@ -65,11 +70,11 @@ public sealed class SlotsServiceTests : IDisposable
 
         DeleteResult result = await service.DeleteSlotAsync(SlotKey.BeforeBed, CancellationToken.None);
 
-        result.Should().Be(DeleteResult.Success);
-        (await service.GetSlotsAsync(CancellationToken.None)).Should().BeEmpty();
+        Assert.That(result, Is.EqualTo(DeleteResult.Success));
+        Assert.That(await service.GetSlotsAsync(CancellationToken.None), Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public async Task DeleteSlotAsync_WithUnknownKey_ReturnsNotFound()
     {
         using AppDbContext db = _database.CreateContext();
@@ -77,8 +82,7 @@ public sealed class SlotsServiceTests : IDisposable
 
         DeleteResult result = await service.DeleteSlotAsync(SlotKey.Breakfast, CancellationToken.None);
 
-        result.Should().Be(DeleteResult.NotFound);
+        Assert.That(result, Is.EqualTo(DeleteResult.NotFound));
     }
 
-    public void Dispose() => _database.Dispose();
 }

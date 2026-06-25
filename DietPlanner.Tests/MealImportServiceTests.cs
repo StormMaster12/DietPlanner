@@ -1,14 +1,19 @@
 using System.Text;
 using DietPlanner.Endpoints.Meal;
 using DietPlanner.Endpoints.Slots;
-using FluentAssertions;
-using Xunit;
 
 namespace DietPlanner.Tests;
 
-public sealed class MealImportServiceTests : IDisposable
+[TestFixture]
+public sealed class MealImportServiceTests
 {
-    private readonly TestDatabase _database = new();
+    private TestDatabase _database = null!;
+
+    [SetUp]
+    public void SetUp() => _database = new TestDatabase();
+
+    [TearDown]
+    public void TearDown() => _database.Dispose();
 
     private static Stream ToStream(string csv) => new MemoryStream(Encoding.UTF8.GetBytes(csv));
 
@@ -22,7 +27,7 @@ public sealed class MealImportServiceTests : IDisposable
         await db.SaveChangesAsync();
     }
 
-    [Fact]
+    [Test]
     public async Task ImportFromCsvAsync_WithNewRows_InsertsMeals()
     {
         await SeedAllSlotsAsync();
@@ -34,17 +39,17 @@ public sealed class MealImportServiceTests : IDisposable
 
         MealImportResult result = await service.ImportFromCsvAsync(ToStream(csv), CancellationToken.None);
 
-        result.InsertedCount.Should().Be(2);
-        result.UpdatedCount.Should().Be(0);
-        result.RowErrors.Should().BeEmpty();
+        Assert.That(result.InsertedCount, Is.EqualTo(2));
+        Assert.That(result.UpdatedCount, Is.EqualTo(0));
+        Assert.That(result.RowErrors, Is.Empty);
 
         MealsService mealsService = new(db);
         IReadOnlyList<MealDto> meals = await mealsService.GetMealsAsync(CancellationToken.None);
-        meals.Should().HaveCount(2);
-        meals.Should().Contain(m => m.Name == "Oatmeal" && m.SlotKey == SlotKey.Breakfast && m.Kcal == 300);
+        Assert.That(meals, Has.Count.EqualTo(2));
+        Assert.That(meals.Any(m => m.Name == "Oatmeal" && m.SlotKey == SlotKey.Breakfast && m.Kcal == 300), Is.True);
     }
 
-    [Fact]
+    [Test]
     public async Task ImportFromCsvAsync_WithExistingMatchingNameAndSlot_UpdatesInsteadOfDuplicating()
     {
         await SeedAllSlotsAsync();
@@ -58,16 +63,16 @@ public sealed class MealImportServiceTests : IDisposable
                             "oatmeal,breakfast,350,12,45,6,2,Oatmeal MFP v2,,\n";
         MealImportResult result = await service.ImportFromCsvAsync(ToStream(secondCsv), CancellationToken.None);
 
-        result.InsertedCount.Should().Be(0);
-        result.UpdatedCount.Should().Be(1);
+        Assert.That(result.InsertedCount, Is.EqualTo(0));
+        Assert.That(result.UpdatedCount, Is.EqualTo(1));
 
         MealsService mealsService = new(db);
         IReadOnlyList<MealDto> meals = await mealsService.GetMealsAsync(CancellationToken.None);
-        meals.Should().ContainSingle();
-        meals.Single().Kcal.Should().Be(350);
+        Assert.That(meals, Has.Count.EqualTo(1));
+        Assert.That(meals.Single().Kcal, Is.EqualTo(350));
     }
 
-    [Fact]
+    [Test]
     public async Task ImportFromCsvAsync_WithUnknownSlotKey_ReportsRowErrorAndSkipsRow()
     {
         await SeedAllSlotsAsync();
@@ -78,11 +83,11 @@ public sealed class MealImportServiceTests : IDisposable
 
         MealImportResult result = await service.ImportFromCsvAsync(ToStream(csv), CancellationToken.None);
 
-        result.InsertedCount.Should().Be(0);
-        result.RowErrors.Should().ContainSingle(e => e.Contains("Row 2") && e.Contains("Brunch"));
+        Assert.That(result.InsertedCount, Is.EqualTo(0));
+        Assert.That(result.RowErrors.Count(e => e.Contains("Row 2") && e.Contains("Brunch")), Is.EqualTo(1));
     }
 
-    [Fact]
+    [Test]
     public async Task ImportFromCsvAsync_WithNonNumericKcal_ReportsRowErrorAndSkipsRow()
     {
         await SeedAllSlotsAsync();
@@ -93,11 +98,11 @@ public sealed class MealImportServiceTests : IDisposable
 
         MealImportResult result = await service.ImportFromCsvAsync(ToStream(csv), CancellationToken.None);
 
-        result.InsertedCount.Should().Be(0);
-        result.RowErrors.Should().ContainSingle(e => e.Contains("Row 2") && e.Contains("Kcal"));
+        Assert.That(result.InsertedCount, Is.EqualTo(0));
+        Assert.That(result.RowErrors.Count(e => e.Contains("Row 2") && e.Contains("Kcal")), Is.EqualTo(1));
     }
 
-    [Fact]
+    [Test]
     public async Task ImportFromCsvAsync_WithOneBadRowAndOneGoodRow_ImportsGoodRowAndReportsBadOne()
     {
         await SeedAllSlotsAsync();
@@ -109,9 +114,8 @@ public sealed class MealImportServiceTests : IDisposable
 
         MealImportResult result = await service.ImportFromCsvAsync(ToStream(csv), CancellationToken.None);
 
-        result.InsertedCount.Should().Be(1);
-        result.RowErrors.Should().ContainSingle(e => e.Contains("Row 3"));
+        Assert.That(result.InsertedCount, Is.EqualTo(1));
+        Assert.That(result.RowErrors.Count(e => e.Contains("Row 3")), Is.EqualTo(1));
     }
 
-    public void Dispose() => _database.Dispose();
 }

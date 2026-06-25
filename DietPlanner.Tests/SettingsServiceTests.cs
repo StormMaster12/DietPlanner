@@ -1,14 +1,19 @@
 using DietPlanner.Endpoints.Settings;
-using FluentAssertions;
-using Xunit;
 
 namespace DietPlanner.Tests;
 
-public sealed class SettingsServiceTests : IDisposable
+[TestFixture]
+public sealed class SettingsServiceTests
 {
-    private readonly TestDatabase _database = new();
+    private TestDatabase _database = null!;
 
-    [Fact]
+    [SetUp]
+    public void SetUp() => _database = new TestDatabase();
+
+    [TearDown]
+    public void TearDown() => _database.Dispose();
+
+    [Test]
     public async Task GetAsync_WithNoSettingsSaved_ReturnsDefaults()
     {
         using AppDbContext db = _database.CreateContext();
@@ -16,10 +21,10 @@ public sealed class SettingsServiceTests : IDisposable
 
         SettingsDto result = await service.GetAsync(CancellationToken.None);
 
-        result.Should().Be(new SettingsDto(2300, 165, 220, 30, 30));
+        Assert.That(result, Is.EqualTo(new SettingsDto(2300, 165, 220, 30, 30)));
     }
 
-    [Fact]
+    [Test]
     public async Task UpdateAsync_ThenGetAsync_RoundTripsValues()
     {
         using AppDbContext db = _database.CreateContext();
@@ -30,10 +35,10 @@ public sealed class SettingsServiceTests : IDisposable
 
         SettingsDto result = await service.GetAsync(CancellationToken.None);
 
-        result.Should().Be(new SettingsDto(2000, 150, 200, 25, 20));
+        Assert.That(result, Is.EqualTo(new SettingsDto(2000, 150, 200, 25, 20)));
     }
 
-    [Fact]
+    [Test]
     public async Task UpdateAsync_CalledTwice_PersistsTheSecondUpdate()
     {
         // Regression test: UpsertKeyAsync used to reassign a `record with` expression to a local
@@ -47,10 +52,10 @@ public sealed class SettingsServiceTests : IDisposable
 
         SettingsDto result = await service.GetAsync(CancellationToken.None);
 
-        result.Should().Be(new SettingsDto(2500, 180, 250, 35, 40));
+        Assert.That(result, Is.EqualTo(new SettingsDto(2500, 180, 250, 35, 40)));
     }
 
-    [Fact]
+    [Test]
     public async Task UpdateAsync_CalledTwiceWithFreshContexts_PersistsTheSecondUpdate()
     {
         UpdateSettingsRequest first = new(2000, 150, 200, 25, 20);
@@ -69,8 +74,7 @@ public sealed class SettingsServiceTests : IDisposable
         using AppDbContext db3 = _database.CreateContext();
         SettingsDto result = await new SettingsService(db3).GetAsync(CancellationToken.None);
 
-        result.Should().Be(new SettingsDto(2500, 180, 250, 35, 40));
+        Assert.That(result, Is.EqualTo(new SettingsDto(2500, 180, 250, 35, 40)));
     }
 
-    public void Dispose() => _database.Dispose();
 }
