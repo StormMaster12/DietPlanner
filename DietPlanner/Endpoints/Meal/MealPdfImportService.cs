@@ -147,7 +147,7 @@ public sealed class MealPdfImportService : IMealPdfImportService
             SystemPrompt,
             [new AnthropicMessage("user", extractedText)]);
 
-        using HttpRequestMessage request = new(HttpMethod.Post, "https://api.anthropic.com/v1/messages");
+        using HttpRequestMessage request = new(HttpMethod.Post, _options.BaseUrl);
         request.Headers.Add("x-api-key", _options.ApiKey);
         request.Headers.Add("anthropic-version", AnthropicVersion);
         request.Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
