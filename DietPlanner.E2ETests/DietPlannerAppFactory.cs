@@ -1,85 +1,138 @@
-using DietPlanner.Endpoints.Slots;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Hosting.Server;
-using Microsoft.AspNetCore.Hosting.Server.Features;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Hosting;
+using System.Diagnostics;
 
 namespace DietPlanner.E2ETests;
 
 /// <summary>
-/// Hosts the real app on a real Kestrel socket (rather than the in-memory TestServer that
-/// <see cref="WebApplicationFactory{TEntryPoint}"/> uses by default) so a Playwright-driven
-/// browser can navigate to it like any other site, backed by a throwaway SQLite database so
-/// e2e runs never touch the git-tracked DietPlannerDatabase.db.
+/// Runs the app as the actual Docker image that ships to production - built once per test run -
+/// rather than an in-process TestServer, so e2e runs exercise the same artifact that gets
+/// deployed. Each instance starts a fresh, disposable container; since the image bundles its own
+/// seeded SQLite db, every container gets an independent copy via Docker's writable layer, so test
+/// runs never interfere with each other or with the git-tracked DietPlannerDatabase.db.
 /// </summary>
-public sealed class DietPlannerAppFactory : WebApplicationFactory<Program>
+public sealed class DietPlannerAppFactory : IDisposable
 {
-    private readonly SqliteConnection _connection = new("DataSource=:memory:");
+    private const string ImageTag = "dietplanner-e2e:test";
+    private static readonly object BuildLock = new();
+    private static bool s_imageBuilt;
+
+    private string _containerId = string.Empty;
     public string ServerAddress { get; private set; } = string.Empty;
 
-    /// <summary>
-    /// Forces <see cref="WebApplicationFactory{TEntryPoint}"/> to build and start the host via
-    /// <see cref="CreateHost"/> (which boots the real Kestrel server and captures
-    /// <see cref="ServerAddress"/>). The base class's own post-build step then tries to cast the
-    /// registered <see cref="IServer"/> to <c>TestServer</c> and throws, since this factory
-    /// deliberately hosts on Kestrel instead - that failure is irrelevant here since the app is
-    /// already up by that point, so it's swallowed.
-    /// </summary>
     public void Start()
+    {
+        EnsureImageBuilt();
+
+        _containerId = RunDocker("run", "-d", "-P", ImageTag).Trim();
+
+        string portMapping = RunDocker("port", _containerId, "8080/tcp").Trim();
+        string hostPort = portMapping.Split(':').Last();
+        ServerAddress = $"http://127.0.0.1:{hostPort}";
+
+        WaitUntilReady();
+    }
+
+    public void Dispose()
+    {
+        if (_containerId.Length > 0)
+        {
+            RunDocker("rm", "-f", _containerId);
+        }
+    }
+
+    private static void EnsureImageBuilt()
+    {
+        if (s_imageBuilt)
+        {
+            return;
+        }
+
+        lock (BuildLock)
+        {
+            if (s_imageBuilt)
+            {
+                return;
+            }
+
+            if (!ImageExists())
+            {
+                RunDocker("build", "-t", ImageTag, FindRepoRoot());
+            }
+
+            s_imageBuilt = true;
+        }
+    }
+
+    private static bool ImageExists()
     {
         try
         {
-            CreateClient().Dispose();
+            RunDocker("image", "inspect", ImageTag);
+            return true;
         }
-        catch (InvalidCastException)
+        catch (InvalidOperationException)
         {
+            return false;
         }
     }
 
-    protected override IHost CreateHost(IHostBuilder builder)
+    private static string FindRepoRoot()
     {
-        _connection.Open();
-
-        builder.ConfigureServices(services =>
+        DirectoryInfo? dir = new(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "DietPlanner.sln")))
         {
-            services.RemoveAll<DbContextOptions<AppDbContext>>();
-            services.AddDbContext<AppDbContext>(opt => opt.UseSqlite(_connection));
-        });
+            dir = dir.Parent;
+        }
 
-        builder.ConfigureWebHost(webHostBuilder => webHostBuilder.UseKestrel().UseUrls("http://127.0.0.1:0"));
-
-        IHost host = builder.Build();
-        host.Start();
-
-        using AppDbContext db = host.Services.GetRequiredService<IServiceScopeFactory>()
-            .CreateScope().ServiceProvider.GetRequiredService<AppDbContext>();
-        db.Database.EnsureCreated();
-
-        db.Slots.AddRange(
-            new Slot(SlotKey.Breakfast, "Breakfast", 1),
-            new Slot(SlotKey.Lunch, "Lunch", 2),
-            new Slot(SlotKey.Dinner, "Dinner", 3),
-            new Slot(SlotKey.BeforeBed, "Before bed", 4));
-        db.SaveChanges();
-
-        IServerAddressesFeature addressesFeature = host.Services.GetRequiredService<IServer>().Features
-            .Get<IServerAddressesFeature>()!;
-        ServerAddress = addressesFeature.Addresses.First();
-
-        return host;
+        return dir?.FullName
+            ?? throw new InvalidOperationException(
+                $"Could not locate repo root (DietPlanner.sln) starting from {AppContext.BaseDirectory}.");
     }
 
-    protected override void Dispose(bool disposing)
+    private void WaitUntilReady()
     {
-        base.Dispose(disposing);
-        if (disposing)
+        using HttpClient client = new() { Timeout = TimeSpan.FromSeconds(2) };
+        Exception? lastError = null;
+
+        for (int attempt = 0; attempt < 30; attempt++)
         {
-            _connection.Dispose();
+            try
+            {
+                client.GetAsync(ServerAddress).GetAwaiter().GetResult();
+                return;
+            }
+            catch (Exception ex)
+            {
+                lastError = ex;
+                Thread.Sleep(500);
+            }
         }
+
+        throw new TimeoutException($"Container at {ServerAddress} did not become ready in time.", lastError);
+    }
+
+    private static string RunDocker(params string[] arguments)
+    {
+        ProcessStartInfo startInfo = new("docker")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        foreach (string arg in arguments)
+        {
+            startInfo.ArgumentList.Add(arg);
+        }
+
+        using Process process = Process.Start(startInfo)!;
+        string stdout = process.StandardOutput.ReadToEnd();
+        string stderr = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"docker {string.Join(' ', arguments)} failed: {stderr}");
+        }
+
+        return stdout;
     }
 }
