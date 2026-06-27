@@ -10,6 +10,8 @@ primary_region = "iad"
 [env]
   ASPNETCORE_ENVIRONMENT = "Production"
   ConnectionStrings__Db = "Data Source=/app/data/DietPlannerDatabase.db"
+  # Secrets (APP_USERNAME, APP_PASSWORD, ANTHROPIC__APIKEY) are set via
+  # `fly secrets set` and must never be committed here.
 
 [http_service]
   internal_port = 8080
@@ -18,7 +20,7 @@ primary_region = "iad"
   auto_start_machines = true
   min_machines_running = 0
 
-  [[http_service.concurrency]]
+  [http_service.concurrency]
     type = "requests"
     hard_limit = 25
     soft_limit = 20
