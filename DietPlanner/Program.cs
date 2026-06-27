@@ -9,6 +9,7 @@ using DietPlanner.Endpoints.WeekPlan;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Logs;
@@ -69,6 +70,19 @@ services.AddScoped<ISettingsService, SettingsService>()
 
 services.Configure<AnthropicOptions>(builder.Configuration.GetSection(AnthropicOptions.SectionName));
 services.AddHttpClient<IMealPdfImportService, MealPdfImportService>();
+
+// Default DataProtection key storage is ephemeral (in-memory/local temp dir). Combined with
+// auto_stop_machines/min_machines_running=0 in fly.toml, every cold start spun up a brand new
+// key ring, so antiforgery cookies issued before the previous stop could never be decrypted
+// again ("key ... was not found in the key ring"). Persisting keys to the same mounted volume
+// used for the SQLite database keeps the ring stable across restarts.
+string? dataProtectionKeysPath = builder.Configuration["DataProtectionKeysPath"];
+if (!string.IsNullOrEmpty(dataProtectionKeysPath))
+{
+    services.AddDataProtection()
+        .SetApplicationName("DietPlanner")
+        .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+}
 
 services.AddValidatorsFromAssemblyContaining<Program>();
 services.AddDbContext<AppDbContext>(opt =>

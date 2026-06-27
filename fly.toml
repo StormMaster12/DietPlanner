@@ -11,6 +11,7 @@ primary_region = 'iad'
 [env]
   ASPNETCORE_ENVIRONMENT = 'Production'
   ConnectionStrings__Db = 'Data Source=/app/data/DietPlannerDatabase.db'
+  DataProtectionKeysPath = '/app/data/keys'
 
 [[mounts]]
   source = 'dietplanner_data'
