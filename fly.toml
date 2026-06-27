@@ -10,6 +10,8 @@ primary_region = "iad"
 [env]
   ASPNETCORE_ENVIRONMENT = "Production"
   ConnectionStrings__Db = "Data Source=/app/data/DietPlannerDatabase.db"
+  # Secrets (APP_USERNAME, APP_PASSWORD, ANTHROPIC__APIKEY) are set via
+  # `fly secrets set` and must never be committed here.
 
 [http_service]
   internal_port = 8080
