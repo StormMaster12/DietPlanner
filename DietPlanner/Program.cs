@@ -9,6 +9,7 @@ using DietPlanner.Endpoints.WeekPlan;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -28,6 +29,11 @@ services.AddSassCompiler();
 // back the minimal API below, without needing a separate JavaScript HTTP client layer.
 services.AddRazorComponents()
     .AddInteractiveServerComponents(options => options.DetailedErrors = builder.Environment.IsDevelopment());
+
+// Default SignalR ClientTimeoutInterval (30s) is too short for the large CSV/PDF meal uploads
+// (MealUploadPage.razor) on slower connections: if a single file-data chunk doesn't arrive in
+// time, the circuit drops with "Did not receive any data in the allotted time" mid-upload.
+services.Configure<HubOptions>(options => options.ClientTimeoutInterval = TimeSpan.FromSeconds(60));
 
 services.AddScoped<ISettingsService, SettingsService>()
     .AddScoped<IDayPlanService, DayPlanService>()
