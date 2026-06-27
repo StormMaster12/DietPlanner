@@ -40,6 +40,10 @@ var services = builder.Services;
 services.AddEndpointsApiExplorer();
 services.AddSwaggerGen();
 
+// Turns unhandled exceptions from the minimal API endpoints into a standard ProblemDetails
+// response (instead of an empty 500) and logs them via IExceptionHandler's default handler.
+services.AddProblemDetails();
+
 #if DEBUG
 services.AddSassCompiler();
 #endif
@@ -118,6 +122,11 @@ using (IServiceScope scope = app.Services.CreateScope())
 }
 
 // Configure the HTTP request pipeline.
+
+// Must run before other middleware so it can catch exceptions thrown further down the pipeline;
+// pairs with AddProblemDetails() above to turn unhandled exceptions into a ProblemDetails response.
+app.UseExceptionHandler();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
