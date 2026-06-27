@@ -26,6 +26,7 @@ public sealed class MealUploadPageTests : PageTestBase
             MimeType = "text/csv",
             Buffer = csvBytes
         });
+        await Page.ClickAsync("text=Upload CSV");
 
         await Expect(Page.Locator(".alert")).ToContainTextAsync("Inserted 1 new meal(s)", new LocatorAssertionsToContainTextOptions { Timeout = 15000 });
     }
@@ -45,6 +46,7 @@ public sealed class MealUploadPageTests : PageTestBase
             MimeType = "text/csv",
             Buffer = csvBytes
         });
+        await Page.ClickAsync("text=Upload CSV");
 
         await Expect(Page.Locator(".alert--error")).ToContainTextAsync("could not be imported", new LocatorAssertionsToContainTextOptions { Timeout = 15000 });
     }
@@ -69,6 +71,7 @@ public sealed class MealUploadPageTests : PageTestBase
             MimeType = "application/pdf",
             Buffer = BuildPdf("Breakfast: oatmeal with berries.")
         });
+        await Page.ClickAsync("text=Upload PDF");
 
         await Expect(Page.Locator(".alert")).ToContainTextAsync("Inserted 1 new meal(s)", new LocatorAssertionsToContainTextOptions { Timeout = 15000 });
     }
