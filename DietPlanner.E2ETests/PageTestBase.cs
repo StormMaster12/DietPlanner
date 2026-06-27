@@ -38,6 +38,13 @@ public abstract class PageTestBase : PageTest
     }
 
     /// <summary>
+    /// Stubs the next call the app makes to the (WireMock-backed) Anthropic API with the given raw
+    /// response body, so PDF-import tests don't depend on the real Anthropic API.
+    /// </summary>
+    protected Task StubAnthropicResponseAsync(string anthropicResponseBody) =>
+        _factory.StubAnthropicResponseAsync(anthropicResponseBody);
+
+    /// <summary>
     /// Navigates relative to the running server, then waits for network idle so the Blazor Server
     /// SignalR circuit has finished connecting before the caller starts interacting with the page
     /// - clicking too early silently no-ops because the circuit isn't wired up yet.
