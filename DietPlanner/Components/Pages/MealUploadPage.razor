@@ -76,7 +76,8 @@
 }
 
 @code {
-    private const long MaxUploadSizeBytes = 5 * 1024 * 1024;
+    private const long MaxCsvUploadSizeBytes = 5 * 1024 * 1024;
+    private const long MaxPdfUploadSizeBytes = 25 * 1024 * 1024;
 
     private bool IsUploading { get; set; }
     private MealImportResult? ImportResult { get; set; }
@@ -119,7 +120,7 @@
 
         try
         {
-            await using Stream uploadedFileStream = SelectedCsvFile.OpenReadStream(MaxUploadSizeBytes);
+            await using Stream uploadedFileStream = SelectedCsvFile.OpenReadStream(MaxCsvUploadSizeBytes);
             ImportResult = await MealImportService.ImportFromCsvAsync(uploadedFileStream, CancellationToken.None);
         }
         catch (Exception ex)
@@ -147,7 +148,7 @@
 
         try
         {
-            await using Stream uploadedFileStream = SelectedPdfFile.OpenReadStream(MaxUploadSizeBytes);
+            await using Stream uploadedFileStream = SelectedPdfFile.OpenReadStream(MaxPdfUploadSizeBytes);
             ImportResult = await MealPdfImportService.ImportFromPdfAsync(uploadedFileStream, CancellationToken.None);
         }
         catch (Exception ex)
