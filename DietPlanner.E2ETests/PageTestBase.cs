@@ -5,19 +5,20 @@ using NUnit.Framework;
 namespace DietPlanner.E2ETests;
 
 /// <summary>
-/// Base class for browser-driven tests: starts a fresh app instance (and database) per test
-/// class and exposes <see cref="GoToAsync"/> for navigating relative to the running server.
+/// Base class for browser-driven tests: reuses the single app instance started once for the whole
+/// run by <see cref="TestRunSetup"/>, resetting its state before each test, and exposes
+/// <see cref="GoToAsync"/> for navigating relative to the running server. Tests share a container
+/// and database, so they must run sequentially rather than in parallel.
 /// </summary>
-[Parallelizable(ParallelScope.Self)]
 public abstract class PageTestBase : PageTest
 {
     private DietPlannerAppFactory _factory = null!;
 
     [SetUp]
-    public async Task CreateAppFactoryAsync()
+    public async Task ResetAppStateAsync()
     {
-        _factory = new DietPlannerAppFactory();
-        await _factory.StartAsync();
+        _factory = TestRunSetup.Factory;
+        await _factory.ResetStateAsync();
     }
 
     public override BrowserNewContextOptions ContextOptions()
@@ -29,12 +30,6 @@ public abstract class PageTestBase : PageTest
             Password = DietPlannerAppFactory.TestPassword,
         };
         return options;
-    }
-
-    [TearDown]
-    public async Task DisposeAppFactoryAsync()
-    {
-        await _factory.DisposeAsync();
     }
 
     /// <summary>
