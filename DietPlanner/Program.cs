@@ -1,6 +1,5 @@
-using System.Security.Cryptography;
-using System.Text;
 using DietPlanner;
+using DietPlanner.Authentication;
 using DietPlanner.Components;
 using DietPlanner.Endpoints.DayPlan;
 using DietPlanner.Endpoints.Meal;
@@ -8,6 +7,8 @@ using DietPlanner.Endpoints.Settings;
 using DietPlanner.Endpoints.Slots;
 using DietPlanner.Endpoints.WeekPlan;
 using FluentValidation;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -40,6 +41,30 @@ services.AddValidatorsFromAssemblyContaining<Program>();
 services.AddDbContext<AppDbContext>(opt =>
     opt.UseSqlite(builder.Configuration.GetConnectionString("Db")));
 
+bool authConfigured = !string.IsNullOrEmpty(builder.Configuration["APP_USERNAME"]) &&
+    !string.IsNullOrEmpty(builder.Configuration["APP_PASSWORD"]);
+if (!authConfigured && !builder.Environment.IsDevelopment())
+{
+    throw new InvalidOperationException(
+        "APP_USERNAME and APP_PASSWORD must be set outside Development (set as Fly secrets).");
+}
+
+services.AddAuthentication(BasicAuthenticationHandler.SchemeName)
+    .AddScheme<AuthenticationSchemeOptions, BasicAuthenticationHandler>(BasicAuthenticationHandler.SchemeName, null);
+
+// Single-user deployment: every endpoint requires auth unless explicitly marked [AllowAnonymous].
+// In Development without credentials configured, leave the default (anonymous-friendly) policy
+// so `dotnet run` works without setting APP_USERNAME/APP_PASSWORD.
+services.AddAuthorization(options =>
+{
+    if (authConfigured)
+    {
+        options.FallbackPolicy = new AuthorizationPolicyBuilder()
+            .RequireAuthenticatedUser()
+            .Build();
+    }
+});
+
 WebApplication app = builder.Build();
 
 // Volume-mounted SQLite starts empty on first boot; apply migrations so the
@@ -56,26 +81,18 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Single-user deployment: reject everything before it reaches Blazor/EF Core so
-// floods cost a header comparison, not a SignalR connection or a DB hit.
+// Single-user deployment: reject requests from non-whitelisted IPs before they reach
+// auth/Blazor/EF Core, so floods cost a header comparison rather than a SignalR connection
+// or a DB hit. No Microsoft authentication package covers network-level ACLs, so this stays
+// as plain middleware; actual credential checking is delegated to BasicAuthenticationHandler.
 string? allowedIpsRaw = builder.Configuration["ALLOWED_IPS"];
 HashSet<string>? allowedIps = string.IsNullOrWhiteSpace(allowedIpsRaw)
     ? null
     : allowedIpsRaw.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToHashSet();
 
-string? appUsername = builder.Configuration["APP_USERNAME"];
-string? appPassword = builder.Configuration["APP_PASSWORD"];
-bool authConfigured = !string.IsNullOrEmpty(appUsername) && !string.IsNullOrEmpty(appPassword);
-
-if (!authConfigured && !app.Environment.IsDevelopment())
+if (allowedIps is not null)
 {
-    throw new InvalidOperationException(
-        "APP_USERNAME and APP_PASSWORD must be set outside Development (set as Fly secrets).");
-}
-
-app.Use(async (context, next) =>
-{
-    if (allowedIps is not null)
+    app.Use(async (context, next) =>
     {
         // Fly's edge always overwrites this header, so clients cannot spoof it.
         string? clientIp = context.Request.Headers["Fly-Client-IP"].FirstOrDefault()
@@ -86,22 +103,13 @@ app.Use(async (context, next) =>
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return;
         }
-    }
 
-    if (authConfigured)
-    {
-        string? header = context.Request.Headers.Authorization.FirstOrDefault();
-        if (header is null || !header.StartsWith("Basic ", StringComparison.Ordinal) ||
-            !TryValidateBasicAuth(header["Basic ".Length..], appUsername!, appPassword!))
-        {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            context.Response.Headers.WWWAuthenticate = "Basic realm=\"DietPlanner\"";
-            return;
-        }
-    }
+        await next();
+    });
+}
 
-    await next();
-});
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
@@ -118,35 +126,4 @@ app.MapRazorComponents<App>()
 
 app.Run();
 
-public partial class Program
-{
-    private static bool TryValidateBasicAuth(string base64Credentials, string expectedUsername, string expectedPassword)
-    {
-        byte[] decodedBytes;
-        try
-        {
-            decodedBytes = Convert.FromBase64String(base64Credentials);
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
-
-        string decoded = Encoding.UTF8.GetString(decodedBytes);
-        int separatorIndex = decoded.IndexOf(':');
-        if (separatorIndex < 0)
-        {
-            return false;
-        }
-
-        string username = decoded[..separatorIndex];
-        string password = decoded[(separatorIndex + 1)..];
-
-        bool usernameMatches = CryptographicOperations.FixedTimeEquals(
-            Encoding.UTF8.GetBytes(username), Encoding.UTF8.GetBytes(expectedUsername));
-        bool passwordMatches = CryptographicOperations.FixedTimeEquals(
-            Encoding.UTF8.GetBytes(password), Encoding.UTF8.GetBytes(expectedPassword));
-
-        return usernameMatches && passwordMatches;
-    }
-}
+public partial class Program { }
