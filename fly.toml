@@ -1,34 +1,33 @@
-# fly.toml — single-instance deployment for DietPlanner
-# This app is Blazor Server (stateful SignalR connections), so it must run
-# as exactly one machine. Do not enable autoscaling or add a second instance.
+# fly.toml app configuration file generated for dieting-app on 2026-06-27T20:50:32Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = "dietplanner"
-primary_region = "iad"
+app = 'dieting-app'
+primary_region = 'iad'
 
 [build]
 
 [env]
-  ASPNETCORE_ENVIRONMENT = "Production"
-  ConnectionStrings__Db = "Data Source=/app/data/DietPlannerDatabase.db"
-  # Secrets (APP_USERNAME, APP_PASSWORD, ANTHROPIC__APIKEY) are set via
-  # `fly secrets set` and must never be committed here.
+  ASPNETCORE_ENVIRONMENT = 'Production'
+  ConnectionStrings__Db = 'Data Source=/app/data/DietPlannerDatabase.db'
+
+[[mounts]]
+  source = 'dietplanner_data'
+  destination = '/app/data'
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = "stop"
+  auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
 
   [http_service.concurrency]
-    type = "requests"
+    type = 'requests'
     hard_limit = 25
     soft_limit = 20
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "256mb"
-
-[mounts]
-  source = "dietplanner_data"
-  destination = "/app/data"
+  size = 'shared-cpu-1x'
+  memory = '256mb'
