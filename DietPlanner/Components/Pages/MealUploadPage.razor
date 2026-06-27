@@ -11,7 +11,12 @@
 </p>
 
 <div class="form__row">
-    <InputFile id="csv-file-input" OnChange="OnCsvFileSelectedAsync" accept=".csv" />
+    <label class="form__label" for="csv-file-input">Choose CSV file</label>
+    <InputFile id="csv-file-input" class="form__control" OnChange="OnCsvFileSelectedAsync" accept=".csv" disabled="@IsUploading" />
+    @if (CsvFileName is not null && !IsUploading)
+    {
+        <p>Selected: @CsvFileName</p>
+    }
 </div>
 
 <h2>Or upload a PDF</h2>
@@ -23,12 +28,17 @@
 </p>
 
 <div class="form__row">
-    <InputFile id="pdf-file-input" OnChange="OnPdfFileSelectedAsync" accept=".pdf" />
+    <label class="form__label" for="pdf-file-input">Choose PDF file</label>
+    <InputFile id="pdf-file-input" class="form__control" OnChange="OnPdfFileSelectedAsync" accept=".pdf" disabled="@IsUploading" />
+    @if (PdfFileName is not null && !IsUploading)
+    {
+        <p>Selected: @PdfFileName</p>
+    }
 </div>
 
 @if (IsUploading)
 {
-    <p>Uploading and importing...</p>
+    <p>Uploading and importing @UploadingFileName...</p>
 }
 
 @if (ImportResult is not null)
@@ -57,6 +67,9 @@
 
     private bool IsUploading { get; set; }
     private MealImportResult? ImportResult { get; set; }
+    private string? CsvFileName { get; set; }
+    private string? PdfFileName { get; set; }
+    private string? UploadingFileName { get; set; }
 
     [Inject]
     private IMealImportService MealImportService { get; set; } = null!;
@@ -66,6 +79,8 @@
 
     private async Task OnCsvFileSelectedAsync(InputFileChangeEventArgs changeEventArgs)
     {
+        CsvFileName = changeEventArgs.File.Name;
+        UploadingFileName = changeEventArgs.File.Name;
         IsUploading = true;
         ImportResult = null;
 
@@ -77,11 +92,14 @@
         finally
         {
             IsUploading = false;
+            UploadingFileName = null;
         }
     }
 
     private async Task OnPdfFileSelectedAsync(InputFileChangeEventArgs changeEventArgs)
     {
+        PdfFileName = changeEventArgs.File.Name;
+        UploadingFileName = changeEventArgs.File.Name;
         IsUploading = true;
         ImportResult = null;
 
@@ -93,6 +111,7 @@
         finally
         {
             IsUploading = false;
+            UploadingFileName = null;
         }
     }
 }
