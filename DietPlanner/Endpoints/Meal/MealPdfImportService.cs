@@ -151,7 +151,7 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
     {
         var requestBody = new AnthropicRequest(
             _options.Model,
-            4096,
+            8192,
             SystemPrompt,
             [new AnthropicMessage("user", extractedText)]);
 
@@ -174,6 +174,13 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
         if (string.IsNullOrWhiteSpace(extractedJson))
         {
             throw new JsonException("Anthropic API returned no text content.");
+        }
+
+        if (anthropicResponse?.StopReason == "max_tokens")
+        {
+            throw new JsonException(
+                "The Anthropic response was truncated because it contained too many meals for a single PDF. " +
+                "Try splitting the PDF into smaller files and importing them separately.");
         }
 
         return JsonSerializer.Deserialize<List<ExtractedMealRow>>(StripMarkdownFences(extractedJson)) ?? [];
@@ -205,7 +212,8 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
         [property: JsonPropertyName("content")] string Content);
 
     private sealed record AnthropicResponse(
-        [property: JsonPropertyName("content")] List<AnthropicContentBlock> Content);
+        [property: JsonPropertyName("content")] List<AnthropicContentBlock> Content,
+        [property: JsonPropertyName("stop_reason")] string? StopReason);
 
     private sealed record AnthropicContentBlock(
         [property: JsonPropertyName("type")] string Type,
