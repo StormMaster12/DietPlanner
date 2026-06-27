@@ -5,6 +5,7 @@ using DietPlanner.Endpoints.DayPlan;
 using DietPlanner.Endpoints.Meal;
 using DietPlanner.Endpoints.Settings;
 using DietPlanner.Endpoints.Slots;
+using DietPlanner.Endpoints.Testing;
 using DietPlanner.Endpoints.WeekPlan;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication;
@@ -186,6 +187,13 @@ app.MapDayEndpoints();
 app.MapMealsEndpoints();
 app.MapSlotsEndpoints();
 app.MapWeekEndpoints();
+
+// The e2e suite reuses one app container across the whole run for speed and resets state between
+// tests via this endpoint instead of recreating the container per test.
+if (builder.Configuration.GetValue<bool>("E2E_TESTING"))
+{
+    app.MapTestResetEndpoints();
+}
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

@@ -8,11 +8,11 @@ using WireMock.Net.Testcontainers;
 namespace DietPlanner.E2ETests;
 
 /// <summary>
-/// Runs the app as the actual Docker image that ships to production - built once per test run via
+/// Runs the app as the actual Docker image that ships to production - built once via
 /// Testcontainers - rather than an in-process TestServer, so e2e runs exercise the same artifact
-/// that gets deployed. Each instance starts a fresh, disposable container; since the image bundles
-/// its own seeded SQLite db, every container gets an independent copy via Docker's writable layer,
-/// so test runs never interfere with each other or with the git-tracked DietPlannerDatabase.db.
+/// that gets deployed. A single instance is started once for the whole test run and reused by
+/// every test; <see cref="ResetStateAsync"/> wipes per-test data between tests instead of paying
+/// for a fresh container each time.
 ///
 /// A WireMock container on the same Docker network stands in for the real Anthropic API - the app
 /// container's Anthropic:BaseUrl is overridden to point at it, so tests can stub LLM responses via
@@ -58,6 +58,7 @@ public sealed class DietPlannerAppFactory : IAsyncDisposable
             .WithPortBinding(ContainerPort, true)
             .WithEnvironment("APP_USERNAME", TestUsername)
             .WithEnvironment("APP_PASSWORD", TestPassword)
+            .WithEnvironment("E2E_TESTING", "true")
             .WithEnvironment("Anthropic__BaseUrl", $"http://{WireMockNetworkAlias}/v1/messages")
             .WithEnvironment("Anthropic__ApiKey", "test-key")
             // The app now requires Basic Auth in Production, so the readiness probe (sent without
@@ -100,6 +101,27 @@ public sealed class DietPlannerAppFactory : IAsyncDisposable
         using HttpResponseMessage response = await adminClient.PostAsync(
             "__admin/mappings", new StringContent(requestJson, Encoding.UTF8, "application/json"));
         response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>
+    /// Wipes per-test app data and any WireMock stub registered via
+    /// <see cref="StubAnthropicResponseAsync"/>, so the shared container starts each test from a
+    /// clean slate without needing to be recreated.
+    /// </summary>
+    public async Task ResetStateAsync()
+    {
+        using HttpClient wireMockAdminClient = _wireMockContainer.CreateClient();
+        using HttpResponseMessage clearMappingsResponse =
+            await wireMockAdminClient.DeleteAsync("__admin/mappings");
+        clearMappingsResponse.EnsureSuccessStatusCode();
+
+        using HttpClient appClient = new() { BaseAddress = new Uri($"{ServerAddress}/") };
+        appClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+            "Basic",
+            Convert.ToBase64String(Encoding.UTF8.GetBytes($"{TestUsername}:{TestPassword}")));
+
+        using HttpResponseMessage resetResponse = await appClient.PostAsync("__test__/reset", content: null);
+        resetResponse.EnsureSuccessStatusCode();
     }
 
     public async ValueTask DisposeAsync()
