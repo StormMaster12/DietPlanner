@@ -118,4 +118,59 @@ public sealed class MealImportServiceTests
         Assert.That(result.RowErrors.Count(e => e.Contains("Row 3")), Is.EqualTo(1));
     }
 
+    [Test]
+    public async Task ImportFromCsvAsync_WithIngredientsColumn_InsertsMealWithIngredients()
+    {
+        await SeedAllSlotsAsync();
+        using AppDbContext db = _database.CreateContext();
+        MealImportService service = new(db);
+        string csv = "Name,SlotKey,Kcal,ProteinG,CarbsG,FibreG,Plants,MfName,ZoeNotes,Notes,Ingredients\n" +
+                      "Oatmeal,Breakfast,300,10,40,5,2,Oatmeal MFP,,,200|g|Oats;1||Egg;2|tbsp|Olive oil\n";
+
+        MealImportResult result = await service.ImportFromCsvAsync(ToStream(csv), CancellationToken.None);
+
+        Assert.That(result.InsertedCount, Is.EqualTo(1));
+        Assert.That(result.RowErrors, Is.Empty);
+
+        MealsService mealsService = new(db);
+        MealDto meal = (await mealsService.GetMealsAsync(CancellationToken.None)).Single();
+        Assert.That(meal.Ingredients, Has.Count.EqualTo(3));
+        Assert.That(meal.Ingredients.Any(i => i.Name == "Oats" && i.Quantity == 200 && i.Unit == "g"), Is.True);
+        Assert.That(meal.Ingredients.Any(i => i.Name == "Egg" && i.Quantity == 1 && i.Unit == null), Is.True);
+    }
+
+    [Test]
+    public async Task ImportFromCsvAsync_WithMalformedIngredient_ReportsRowErrorAndSkipsRow()
+    {
+        await SeedAllSlotsAsync();
+        using AppDbContext db = _database.CreateContext();
+        MealImportService service = new(db);
+        string csv = "Name,SlotKey,Kcal,ProteinG,CarbsG,FibreG,Plants,MfName,ZoeNotes,Notes,Ingredients\n" +
+                      "Oatmeal,Breakfast,300,10,40,5,2,Oatmeal MFP,,,not-a-valid-ingredient\n";
+
+        MealImportResult result = await service.ImportFromCsvAsync(ToStream(csv), CancellationToken.None);
+
+        Assert.That(result.InsertedCount, Is.EqualTo(0));
+        Assert.That(result.RowErrors.Count(e => e.Contains("Row 2") && e.Contains("Quantity|Unit|Name")), Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task ImportFromCsvAsync_WithoutIngredientsColumn_LeavesExistingIngredientsUntouched()
+    {
+        await SeedAllSlotsAsync();
+        using AppDbContext db = _database.CreateContext();
+        MealImportService service = new(db);
+        string firstCsv = "Name,SlotKey,Kcal,ProteinG,CarbsG,FibreG,Plants,MfName,ZoeNotes,Notes,Ingredients\n" +
+                           "Oatmeal,Breakfast,300,10,40,5,2,Oatmeal MFP,,,200|g|Oats\n";
+        await service.ImportFromCsvAsync(ToStream(firstCsv), CancellationToken.None);
+
+        string secondCsv = "Name,SlotKey,Kcal,ProteinG,CarbsG,FibreG,Plants,MfName,ZoeNotes,Notes\n" +
+                            "Oatmeal,Breakfast,350,10,40,5,2,Oatmeal MFP,,\n";
+        await service.ImportFromCsvAsync(ToStream(secondCsv), CancellationToken.None);
+
+        MealsService mealsService = new(db);
+        MealDto meal = (await mealsService.GetMealsAsync(CancellationToken.None)).Single();
+        Assert.That(meal.Kcal, Is.EqualTo(350));
+        Assert.That(meal.Ingredients.Any(i => i.Name == "Oats"), Is.True);
+    }
 }

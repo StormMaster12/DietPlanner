@@ -20,15 +20,18 @@ internal static class MealImportUpsert
 
         foreach (MealImportRow row in parsedRows)
         {
-            MealEntry? existingMeal = await db.Meals.SingleOrDefaultAsync(
-                m => m.SlotKey == row.SlotKey && m.Name.ToLower() == row.Name.ToLower(),
-                cancellationToken);
+            MealEntry? existingMeal = await db.Meals
+                .Include(m => m.Ingredients)
+                .SingleOrDefaultAsync(
+                    m => m.SlotKey == row.SlotKey && m.Name.ToLower() == row.Name.ToLower(),
+                    cancellationToken);
 
             if (existingMeal is null)
             {
+                Guid mealId = Guid.NewGuid();
                 db.Meals.Add(new MealEntry
                 {
-                    Id = Guid.NewGuid(),
+                    Id = mealId,
                     Name = row.Name,
                     SlotKey = row.SlotKey,
                     Kcal = row.Kcal,
@@ -38,7 +41,8 @@ internal static class MealImportUpsert
                     Plants = row.Plants,
                     MfName = row.MfName,
                     ZoeNotes = row.ZoeNotes,
-                    Notes = row.Notes
+                    Notes = row.Notes,
+                    Ingredients = ToIngredientEntities(row.Ingredients, mealId)
                 });
                 insertedCount++;
             }
@@ -52,6 +56,16 @@ internal static class MealImportUpsert
                 existingMeal.MfName = row.MfName;
                 existingMeal.ZoeNotes = row.ZoeNotes;
                 existingMeal.Notes = row.Notes;
+
+                if (row.Ingredients is not null)
+                {
+                    // Same Clear() + explicit AddRange to the DbSet as MealsService.UpsertMealAsync -
+                    // existingMeal is already tracked, so EF would otherwise mistake the new rows'
+                    // client-set Guid keys for existing rows and mark them Modified instead of Added.
+                    existingMeal.Ingredients.Clear();
+                    db.MealIngredients.AddRange(ToIngredientEntities(row.Ingredients, existingMeal.Id));
+                }
+
                 updatedCount++;
             }
         }
@@ -60,4 +74,14 @@ internal static class MealImportUpsert
 
         return new MealImportResult(insertedCount, updatedCount, rowErrors);
     }
+
+    private static List<MealIngredient> ToIngredientEntities(IReadOnlyList<MealImportIngredientRow>? ingredients, Guid mealId)
+        => (ingredients ?? []).Select(i => new MealIngredient
+        {
+            Id = Guid.NewGuid(),
+            MealId = mealId,
+            Name = i.Name,
+            Quantity = i.Quantity,
+            Unit = i.Unit
+        }).ToList();
 }

@@ -28,6 +28,13 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
           reuse "name" if nothing better is available.
         - zoeNotes (string or null): any notes related to gut health / the ZOE program, else null.
         - notes (string or null): any other free-text notes worth keeping, else null.
+        - ingredients (array, required): every distinct ingredient line used in the recipe, each an
+          object with:
+          - name (string, required): the ingredient's name, e.g. "chicken breast".
+          - quantity (number, required): the amount; 0 if no amount is stated.
+          - unit (string or null): unit of measure, e.g. "g", "tbsp", "cup"; null for countable items
+            (e.g. "2 eggs").
+          Use an empty array if the text doesn't break the meal down into individual ingredients.
 
         The text may contain "### Chapter: <name>" marker lines inserted by the importer to show
         which section of the source document the following meals came from (e.g. "### Chapter:
@@ -288,6 +295,12 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
                     throw new FormatException($"Unknown slotKey '{extractedRow.SlotKey}'. Expected one of: {string.Join(", ", Enum.GetNames<SlotKey>())}");
                 }
 
+                List<MealImportIngredientRow> ingredients = (extractedRow.Ingredients ?? [])
+                    .Select(i => string.IsNullOrWhiteSpace(i.Name)
+                        ? throw new FormatException("An ingredient is missing a name")
+                        : new MealImportIngredientRow(i.Name, i.Quantity, i.Unit))
+                    .ToList();
+
                 parsedRows.Add(new MealImportRow(
                     extractedRow.Name,
                     slotKey,
@@ -298,7 +311,8 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
                     extractedRow.Plants,
                     extractedRow.MfName,
                     extractedRow.ZoeNotes,
-                    extractedRow.Notes));
+                    extractedRow.Notes,
+                    ingredients));
             }
             catch (FormatException ex)
             {
@@ -392,5 +406,11 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
         [property: JsonPropertyName("plants")] int Plants,
         [property: JsonPropertyName("mfName")] string MfName,
         [property: JsonPropertyName("zoeNotes")] string? ZoeNotes,
-        [property: JsonPropertyName("notes")] string? Notes);
+        [property: JsonPropertyName("notes")] string? Notes,
+        [property: JsonPropertyName("ingredients")] List<ExtractedIngredientRow>? Ingredients);
+
+    private sealed record ExtractedIngredientRow(
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("quantity")] decimal Quantity,
+        [property: JsonPropertyName("unit")] string? Unit);
 }
