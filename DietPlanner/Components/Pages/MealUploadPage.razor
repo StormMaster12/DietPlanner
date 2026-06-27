@@ -92,15 +92,6 @@
     [Inject]
     private IMealPdfImportService MealPdfImportService { get; set; } = null!;
 
-    [Inject]
-    private ILogger<MealUploadPage> Logger { get; set; } = null!;
-
-    [LoggerMessage(Level = LogLevel.Error, Message = "CSV meal import failed for file '{FileName}'")]
-    private partial void LogCsvImportFailed(Exception exception, string fileName);
-
-    [LoggerMessage(Level = LogLevel.Error, Message = "PDF meal import failed for file '{FileName}'")]
-    private partial void LogPdfImportFailed(Exception exception, string fileName);
-
     private void OnCsvFileSelected(InputFileChangeEventArgs changeEventArgs)
     {
         SelectedCsvFile = changeEventArgs.File;
