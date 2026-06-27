@@ -20,6 +20,17 @@ public abstract class PageTestBase : PageTest
         await _factory.StartAsync();
     }
 
+    public override BrowserNewContextOptions ContextOptions()
+    {
+        BrowserNewContextOptions options = base.ContextOptions();
+        options.HttpCredentials = new HttpCredentials
+        {
+            Username = DietPlannerAppFactory.TestUsername,
+            Password = DietPlannerAppFactory.TestPassword,
+        };
+        return options;
+    }
+
     [TearDown]
     public async Task DisposeAppFactoryAsync()
     {

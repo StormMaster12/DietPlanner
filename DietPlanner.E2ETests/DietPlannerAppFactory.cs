@@ -15,6 +15,9 @@ public sealed class DietPlannerAppFactory : IAsyncDisposable
 {
     private const ushort ContainerPort = 8080;
 
+    public const string TestUsername = "e2e-test-user";
+    public const string TestPassword = "e2e-test-password";
+
     private static readonly IFutureDockerImage Image = new ImageFromDockerfileBuilder()
         .WithDockerfileDirectory(CommonDirectoryPath.GetSolutionDirectory(), string.Empty)
         .WithDockerfile("Dockerfile")
@@ -33,7 +36,13 @@ public sealed class DietPlannerAppFactory : IAsyncDisposable
         _container = new ContainerBuilder()
             .WithImage(Image)
             .WithPortBinding(ContainerPort, true)
-            .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(r => r.ForPort(ContainerPort)))
+            .WithEnvironment("APP_USERNAME", TestUsername)
+            .WithEnvironment("APP_PASSWORD", TestPassword)
+            // The app now requires Basic Auth in Production, so the readiness probe (sent without
+            // credentials) gets a 401 once the server is actually up - that counts as "ready" here.
+            .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(r => r
+                .ForPort(ContainerPort)
+                .ForStatusCodeMatching(code => code == System.Net.HttpStatusCode.Unauthorized)))
             .Build();
 
         await _container.StartAsync();
