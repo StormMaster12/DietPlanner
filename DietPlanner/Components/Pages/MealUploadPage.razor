@@ -12,11 +12,14 @@
 
 <div class="form__row">
     <label class="form__label" for="csv-file-input">Choose CSV file</label>
-    <InputFile id="csv-file-input" class="form__control" OnChange="OnCsvFileSelectedAsync" accept=".csv" disabled="@IsUploading" />
-    @if (CsvFileName is not null && !IsUploading)
+    <InputFile id="csv-file-input" class="form__control" OnChange="OnCsvFileSelected" accept=".csv" disabled="@IsUploading" />
+    @if (SelectedCsvFile is not null)
     {
-        <p>Selected: @CsvFileName</p>
+        <p>Selected: @SelectedCsvFile.Name</p>
     }
+    <button type="button" class="btn btn--primary" disabled="@(SelectedCsvFile is null || IsUploading)" @onclick="UploadCsvAsync">
+        Upload CSV
+    </button>
 </div>
 
 <h2>Or upload a PDF</h2>
@@ -29,16 +32,26 @@
 
 <div class="form__row">
     <label class="form__label" for="pdf-file-input">Choose PDF file</label>
-    <InputFile id="pdf-file-input" class="form__control" OnChange="OnPdfFileSelectedAsync" accept=".pdf" disabled="@IsUploading" />
-    @if (PdfFileName is not null && !IsUploading)
+    <InputFile id="pdf-file-input" class="form__control" OnChange="OnPdfFileSelected" accept=".pdf" disabled="@IsUploading" />
+    @if (SelectedPdfFile is not null)
     {
-        <p>Selected: @PdfFileName</p>
+        <p>Selected: @SelectedPdfFile.Name</p>
     }
+    <button type="button" class="btn btn--primary" disabled="@(SelectedPdfFile is null || IsUploading)" @onclick="UploadPdfAsync">
+        Upload PDF
+    </button>
 </div>
 
 @if (IsUploading)
 {
     <p>Uploading and importing @UploadingFileName...</p>
+}
+
+@if (ErrorMessage is not null)
+{
+    <div class="alert alert--error">
+        <p>Something went wrong: @ErrorMessage</p>
+    </div>
 }
 
 @if (ImportResult is not null)
@@ -67,9 +80,10 @@
 
     private bool IsUploading { get; set; }
     private MealImportResult? ImportResult { get; set; }
-    private string? CsvFileName { get; set; }
-    private string? PdfFileName { get; set; }
+    private string? ErrorMessage { get; set; }
     private string? UploadingFileName { get; set; }
+    private IBrowserFile? SelectedCsvFile { get; set; }
+    private IBrowserFile? SelectedPdfFile { get; set; }
 
     [Inject]
     private IMealImportService MealImportService { get; set; } = null!;
@@ -77,17 +91,40 @@
     [Inject]
     private IMealPdfImportService MealPdfImportService { get; set; } = null!;
 
-    private async Task OnCsvFileSelectedAsync(InputFileChangeEventArgs changeEventArgs)
+    private void OnCsvFileSelected(InputFileChangeEventArgs changeEventArgs)
     {
-        CsvFileName = changeEventArgs.File.Name;
-        UploadingFileName = changeEventArgs.File.Name;
+        SelectedCsvFile = changeEventArgs.File;
+        ImportResult = null;
+        ErrorMessage = null;
+    }
+
+    private void OnPdfFileSelected(InputFileChangeEventArgs changeEventArgs)
+    {
+        SelectedPdfFile = changeEventArgs.File;
+        ImportResult = null;
+        ErrorMessage = null;
+    }
+
+    private async Task UploadCsvAsync()
+    {
+        if (SelectedCsvFile is null)
+        {
+            return;
+        }
+
+        UploadingFileName = SelectedCsvFile.Name;
         IsUploading = true;
         ImportResult = null;
+        ErrorMessage = null;
 
         try
         {
-            await using Stream uploadedFileStream = changeEventArgs.File.OpenReadStream(MaxUploadSizeBytes);
+            await using Stream uploadedFileStream = SelectedCsvFile.OpenReadStream(MaxUploadSizeBytes);
             ImportResult = await MealImportService.ImportFromCsvAsync(uploadedFileStream, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
         }
         finally
         {
@@ -96,17 +133,26 @@
         }
     }
 
-    private async Task OnPdfFileSelectedAsync(InputFileChangeEventArgs changeEventArgs)
+    private async Task UploadPdfAsync()
     {
-        PdfFileName = changeEventArgs.File.Name;
-        UploadingFileName = changeEventArgs.File.Name;
+        if (SelectedPdfFile is null)
+        {
+            return;
+        }
+
+        UploadingFileName = SelectedPdfFile.Name;
         IsUploading = true;
         ImportResult = null;
+        ErrorMessage = null;
 
         try
         {
-            await using Stream uploadedFileStream = changeEventArgs.File.OpenReadStream(MaxUploadSizeBytes);
+            await using Stream uploadedFileStream = SelectedPdfFile.OpenReadStream(MaxUploadSizeBytes);
             ImportResult = await MealPdfImportService.ImportFromPdfAsync(uploadedFileStream, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
         }
         finally
         {
