@@ -1,0 +1,32 @@
+# fly.toml — single-instance deployment for DietPlanner
+# This app is Blazor Server (stateful SignalR connections), so it must run
+# as exactly one machine. Do not enable autoscaling or add a second instance.
+
+app = "dietplanner"
+primary_region = "iad"
+
+[build]
+
+[env]
+  ASPNETCORE_ENVIRONMENT = "Production"
+  ConnectionStrings__Db = "Data Source=/app/data/DietPlannerDatabase.db"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.concurrency]]
+    type = "requests"
+    hard_limit = 25
+    soft_limit = 20
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+
+[mounts]
+  source = "dietplanner_data"
+  destination = "/app/data"
