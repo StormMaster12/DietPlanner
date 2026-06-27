@@ -9,15 +9,40 @@ using DietPlanner.Endpoints.WeekPlan;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Resources;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+
+// Replace the default plain-text console formatter with structured logging: the plain formatter
+// writes multi-line messages (e.g. exception stack traces) as continuation lines with no level
+// marker of their own, which log viewers that read stdout line-by-line (Fly's log viewer, basic
+// Docker log shippers) misattribute to whatever level/category preceded them - that's why error
+// logs have been showing up tagged as "info". JSON console emits one self-contained record per
+// line, and the OpenTelemetry logging provider gives every record a properly classified severity
+// that can be exported to any OTEL-compatible backend by swapping the exporter below.
+builder.Logging.ClearProviders();
+builder.Logging.AddJsonConsole(options => options.IncludeScopes = true);
+builder.Logging.AddOpenTelemetry(otelOptions =>
+{
+    otelOptions.IncludeScopes = true;
+    otelOptions.IncludeFormattedMessage = true;
+    otelOptions.ParseStateValues = true;
+    otelOptions.SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("DietPlanner"));
+    otelOptions.AddConsoleExporter();
+});
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 var services = builder.Services;
 services.AddEndpointsApiExplorer();
 services.AddSwaggerGen();
+
+// Turns unhandled exceptions from the minimal API endpoints into a standard ProblemDetails
+// response (instead of an empty 500) and logs them via IExceptionHandler's default handler.
+services.AddProblemDetails();
 
 #if DEBUG
 services.AddSassCompiler();
@@ -28,6 +53,11 @@ services.AddSassCompiler();
 // back the minimal API below, without needing a separate JavaScript HTTP client layer.
 services.AddRazorComponents()
     .AddInteractiveServerComponents(options => options.DetailedErrors = builder.Environment.IsDevelopment());
+
+// Default SignalR ClientTimeoutInterval (30s) is too short for the large CSV/PDF meal uploads
+// (MealUploadPage.razor) on slower connections: if a single file-data chunk doesn't arrive in
+// time, the circuit drops with "Did not receive any data in the allotted time" mid-upload.
+services.Configure<HubOptions>(options => options.ClientTimeoutInterval = TimeSpan.FromSeconds(60));
 
 services.AddScoped<ISettingsService, SettingsService>()
     .AddScoped<IDayPlanService, DayPlanService>()
@@ -92,6 +122,11 @@ using (IServiceScope scope = app.Services.CreateScope())
 }
 
 // Configure the HTTP request pipeline.
+
+// Must run before other middleware so it can catch exceptions thrown further down the pipeline;
+// pairs with AddProblemDetails() above to turn unhandled exceptions into a ProblemDetails response.
+app.UseExceptionHandler();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

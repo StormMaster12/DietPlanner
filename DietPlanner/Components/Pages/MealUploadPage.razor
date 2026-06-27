@@ -125,6 +125,7 @@
         }
         catch (Exception ex)
         {
+            LogCsvImportFailed(ex, SelectedCsvFile.Name);
             ErrorMessage = ex.Message;
         }
         finally
@@ -153,6 +154,7 @@
         }
         catch (Exception ex)
         {
+            LogPdfImportFailed(ex, SelectedPdfFile.Name);
             ErrorMessage = ex.Message;
         }
         finally

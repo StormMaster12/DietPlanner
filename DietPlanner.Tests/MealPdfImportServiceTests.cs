@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using DietPlanner.Endpoints.Meal;
 using DietPlanner.Endpoints.Slots;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Core;
@@ -46,7 +47,7 @@ public sealed class MealPdfImportServiceTests
         StubHttpMessageHandler handler = new(anthropicResponseBody);
         HttpClient httpClient = new(handler);
         IOptions<AnthropicOptions> options = Options.Create(new AnthropicOptions { ApiKey = apiKey, Model = "claude-sonnet-4-6" });
-        return new MealPdfImportService(db, httpClient, options);
+        return new MealPdfImportService(db, httpClient, options, NullLogger<MealPdfImportService>.Instance);
     }
 
     private static string BuildAnthropicResponse(string extractedJsonArray)

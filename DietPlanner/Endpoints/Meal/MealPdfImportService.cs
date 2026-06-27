@@ -2,12 +2,13 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DietPlanner.Endpoints.Slots;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using UglyToad.PdfPig;
 
 namespace DietPlanner.Endpoints.Meal;
 
-public sealed class MealPdfImportService : IMealPdfImportService
+public sealed partial class MealPdfImportService : IMealPdfImportService
 {
     private const string AnthropicVersion = "2023-06-01";
 
@@ -34,13 +35,19 @@ public sealed class MealPdfImportService : IMealPdfImportService
     private readonly AppDbContext _db;
     private readonly HttpClient _httpClient;
     private readonly AnthropicOptions _options;
+    private readonly ILogger<MealPdfImportService> _logger;
 
-    public MealPdfImportService(AppDbContext db, HttpClient httpClient, IOptions<AnthropicOptions> options)
+    public MealPdfImportService(
+        AppDbContext db, HttpClient httpClient, IOptions<AnthropicOptions> options, ILogger<MealPdfImportService> logger)
     {
         _db = db;
         _httpClient = httpClient;
         _options = options.Value;
+        _logger = logger;
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Anthropic API call failed while extracting meals from PDF text")]
+    private partial void LogAnthropicCallFailed(Exception exception);
 
     public async Task<MealImportResult> ImportFromPdfAsync(Stream pdfFileContent, CancellationToken cancellationToken)
     {
@@ -91,6 +98,7 @@ public sealed class MealPdfImportService : IMealPdfImportService
         }
         catch (Exception ex) when (ex is HttpRequestException or JsonException)
         {
+            LogAnthropicCallFailed(ex);
             rowErrors.Add($"Could not extract meals from the PDF: {ex.Message}");
             return ([], rowErrors);
         }
