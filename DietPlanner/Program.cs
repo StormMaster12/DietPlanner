@@ -71,7 +71,21 @@ WebApplication app = builder.Build();
 // schema exists without needing to ship a pre-built .db file to the volume.
 using (IServiceScope scope = app.Services.CreateScope())
 {
-    scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
+    AppDbContext dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    dbContext.Database.Migrate();
+
+    // Slots are reference data the UI assumes always exists (meals can't be saved against a
+    // slot that isn't in this table, and there's no UI to create one), so seed the fixed set
+    // here rather than relying on a pre-populated database.
+    if (!await dbContext.Slots.AnyAsync())
+    {
+        dbContext.Slots.AddRange(
+            new Slot(SlotKey.Breakfast, "Breakfast", 1),
+            new Slot(SlotKey.Lunch, "Lunch", 2),
+            new Slot(SlotKey.Dinner, "Dinner", 3),
+            new Slot(SlotKey.BeforeBed, "Before bed", 4));
+        await dbContext.SaveChangesAsync();
+    }
 }
 
 // Configure the HTTP request pipeline.
