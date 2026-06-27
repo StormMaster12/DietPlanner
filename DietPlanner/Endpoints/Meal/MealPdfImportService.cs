@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using DietPlanner.Endpoints.Slots;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -28,9 +29,24 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
         - zoeNotes (string or null): any notes related to gut health / the ZOE program, else null.
         - notes (string or null): any other free-text notes worth keeping, else null.
 
+        The text may contain "### Chapter: <name>" marker lines inserted by the importer to show
+        which section of the source document the following meals came from (e.g. "### Chapter:
+        Breakfast", "### Chapter: Dinner (continued)"). Treat the chapter name as a strong signal
+        for slotKey - "Breakfast"/"Lunch"/"Dinner" map directly, and "Snack(s)"/"Supper"/"Before Bed"
+        map to "BeforeBed" - but let a meal's own description override the chapter when it clearly
+        belongs to a different slot. A "(continued)" suffix just means the chapter's text was split
+        across multiple requests; it does not change the slotKey. Never emit the marker lines
+        themselves as meal data.
+
         Respond with ONLY a raw JSON array of these objects - no markdown fences, no commentary. If
         the text contains no identifiable meals, respond with an empty array [].
         """;
+
+    private const int MaxChunkChars = 8000;
+
+    private static readonly Regex ChapterKeywordRegex = new(
+        @"\b(breakfast|lunch|dinner|before\s*bed|supper|snacks?|dessert)\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private readonly AppDbContext _db;
     private readonly HttpClient _httpClient;
@@ -80,6 +96,148 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
         return textBuilder.ToString();
     }
 
+    /// <summary>
+    /// Recognises short, standalone section headings (e.g. "Breakfast", "Snacks &amp; Before Bed",
+    /// "Dinner:") without matching ordinary sentences that merely mention a meal in passing (e.g.
+    /// "Breakfast: oatmeal with berries.") - those have content after the keyword and are left as body
+    /// text. Word-boundary matching also keeps "brunch" from being mistaken for "lunch".
+    /// </summary>
+    private static bool TryGetChapterHeading(string line, out string heading)
+    {
+        heading = "";
+        string trimmed = line.Trim();
+
+        if (trimmed.Length == 0 || trimmed.Length > 40 || trimmed.Any(char.IsDigit))
+        {
+            return false;
+        }
+
+        if (trimmed.EndsWith('.') || trimmed.EndsWith(','))
+        {
+            return false;
+        }
+
+        string candidate = trimmed;
+        int colonIndex = candidate.IndexOf(':');
+        if (colonIndex >= 0)
+        {
+            if (colonIndex != candidate.Length - 1)
+            {
+                return false;
+            }
+
+            candidate = candidate[..colonIndex].TrimEnd();
+        }
+
+        if (candidate.Length == 0 || candidate.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length > 4)
+        {
+            return false;
+        }
+
+        if (!ChapterKeywordRegex.IsMatch(candidate))
+        {
+            return false;
+        }
+
+        heading = candidate;
+        return true;
+    }
+
+    private static List<TextChapter> SplitIntoChapters(string text)
+    {
+        var chapters = new List<TextChapter>();
+        StringBuilder currentBody = new();
+        string currentHeading = "Unspecified";
+
+        foreach (string line in text.Split('\n'))
+        {
+            if (TryGetChapterHeading(line, out string heading))
+            {
+                if (currentBody.Length > 0)
+                {
+                    chapters.Add(new TextChapter(currentHeading, currentBody.ToString()));
+                    currentBody.Clear();
+                }
+
+                currentHeading = heading;
+                continue;
+            }
+
+            currentBody.AppendLine(line);
+        }
+
+        if (currentBody.Length > 0)
+        {
+            chapters.Add(new TextChapter(currentHeading, currentBody.ToString()));
+        }
+
+        return chapters;
+    }
+
+    /// <summary>
+    /// Groups chapters into request-sized chunks, each prefixed with "### Chapter: ..." markers so a
+    /// chunk that doesn't start at a chapter boundary (because the chapter itself was too long, or it
+    /// was bundled with neighbouring chapters) still carries its slot-key context for the model.
+    /// </summary>
+    private static List<string> BuildChunks(List<TextChapter> chapters)
+    {
+        var chunks = new List<string>();
+        StringBuilder currentChunk = new();
+
+        void FlushChunk()
+        {
+            if (currentChunk.Length > 0)
+            {
+                chunks.Add(currentChunk.ToString());
+                currentChunk.Clear();
+            }
+        }
+
+        foreach (TextChapter chapter in chapters)
+        {
+            string remainingBody = chapter.Body;
+            bool isFirstPiece = true;
+
+            while (remainingBody.Length > 0)
+            {
+                if (currentChunk.Length > 0 && currentChunk.Length + remainingBody.Length > MaxChunkChars)
+                {
+                    FlushChunk();
+                }
+
+                int capacity = MaxChunkChars - currentChunk.Length;
+                int take = Math.Min(capacity, remainingBody.Length);
+                if (take < remainingBody.Length)
+                {
+                    int lastNewline = remainingBody.LastIndexOf('\n', Math.Max(take - 1, 0));
+                    if (lastNewline > 0)
+                    {
+                        take = lastNewline + 1;
+                    }
+                }
+
+                string piece = remainingBody[..take];
+                remainingBody = remainingBody[take..];
+
+                string heading = isFirstPiece ? chapter.Heading : $"{chapter.Heading} (continued)";
+                currentChunk.AppendLine($"### Chapter: {heading}");
+                currentChunk.Append(piece);
+                currentChunk.AppendLine();
+                isFirstPiece = false;
+
+                if (currentChunk.Length >= MaxChunkChars)
+                {
+                    FlushChunk();
+                }
+            }
+        }
+
+        FlushChunk();
+        return chunks;
+    }
+
+    private sealed record TextChapter(string Heading, string Body);
+
     private async Task<(List<MealImportRow> ParsedRows, List<string> RowErrors)> ExtractRowsAsync(
         string extractedText, CancellationToken cancellationToken)
     {
@@ -91,16 +249,20 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
             return ([], rowErrors);
         }
 
-        List<ExtractedMealRow> extractedRows;
-        try
+        var extractedRows = new List<ExtractedMealRow>();
+        List<string> chunks = BuildChunks(SplitIntoChapters(extractedText));
+        for (int chunkIndex = 0; chunkIndex < chunks.Count; chunkIndex++)
         {
-            extractedRows = await CallAnthropicAsync(extractedText, cancellationToken);
-        }
-        catch (Exception ex) when (ex is HttpRequestException or JsonException)
-        {
-            LogAnthropicCallFailed(ex);
-            rowErrors.Add($"Could not extract meals from the PDF: {ex.Message}");
-            return ([], rowErrors);
+            try
+            {
+                extractedRows.AddRange(await CallAnthropicAsync(chunks[chunkIndex], cancellationToken));
+            }
+            catch (Exception ex) when (ex is HttpRequestException or JsonException)
+            {
+                LogAnthropicCallFailed(ex);
+                string part = chunks.Count > 1 ? $"part {chunkIndex + 1} of {chunks.Count} of " : "";
+                rowErrors.Add($"Could not extract meals from {part}the PDF: {ex.Message}");
+            }
         }
 
         var parsedRows = new List<MealImportRow>();
@@ -151,7 +313,7 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
     {
         var requestBody = new AnthropicRequest(
             _options.Model,
-            4096,
+            8192,
             SystemPrompt,
             [new AnthropicMessage("user", extractedText)]);
 
@@ -174,6 +336,14 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
         if (string.IsNullOrWhiteSpace(extractedJson))
         {
             throw new JsonException("Anthropic API returned no text content.");
+        }
+
+        if (anthropicResponse?.StopReason == "max_tokens")
+        {
+            throw new JsonException(
+                "The Anthropic response was truncated because it described too many meals to fit in a " +
+                "single reply, even after splitting the PDF by chapter. Try splitting the source PDF into " +
+                "smaller files and importing them separately.");
         }
 
         return JsonSerializer.Deserialize<List<ExtractedMealRow>>(StripMarkdownFences(extractedJson)) ?? [];
@@ -205,7 +375,8 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
         [property: JsonPropertyName("content")] string Content);
 
     private sealed record AnthropicResponse(
-        [property: JsonPropertyName("content")] List<AnthropicContentBlock> Content);
+        [property: JsonPropertyName("content")] List<AnthropicContentBlock> Content,
+        [property: JsonPropertyName("stop_reason")] string? StopReason);
 
     private sealed record AnthropicContentBlock(
         [property: JsonPropertyName("type")] string Type,
