@@ -103,6 +103,29 @@ public sealed class MealPdfImportServiceTests
     }
 
     [Test]
+    public async Task ImportFromPdfAsync_WithIngredientsInLlmResponse_InsertsMealWithIngredients()
+    {
+        await SeedAllSlotsAsync();
+        using AppDbContext db = _database.CreateContext();
+
+        string extractedJsonArray = """
+            [{"name":"Oatmeal","slotKey":"Breakfast","kcal":300,"proteinG":10,"carbsG":40,"fibreG":5,"plants":2,"mfName":"Oatmeal MFP","zoeNotes":null,"notes":null,"ingredients":[{"name":"Oats","quantity":200,"unit":"g"},{"name":"Egg","quantity":1,"unit":null}]}]
+            """;
+        MealPdfImportService service = CreateService(db, BuildAnthropicResponse(extractedJsonArray));
+
+        MealImportResult result = await service.ImportFromPdfAsync(BuildPdf("Breakfast: oatmeal with an egg."), CancellationToken.None);
+
+        Assert.That(result.InsertedCount, Is.EqualTo(1));
+        Assert.That(result.RowErrors, Is.Empty);
+
+        MealsService mealsService = new(db);
+        MealDto meal = (await mealsService.GetMealsAsync(CancellationToken.None)).Single();
+        Assert.That(meal.Ingredients, Has.Count.EqualTo(2));
+        Assert.That(meal.Ingredients.Any(i => i.Name == "Oats" && i.Quantity == 200 && i.Unit == "g"), Is.True);
+        Assert.That(meal.Ingredients.Any(i => i.Name == "Egg" && i.Quantity == 1 && i.Unit == null), Is.True);
+    }
+
+    [Test]
     public async Task ImportFromPdfAsync_WithUnknownSlotKeyFromLlm_ReportsItemErrorAndSkipsRow()
     {
         await SeedAllSlotsAsync();

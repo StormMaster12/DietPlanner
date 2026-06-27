@@ -10,6 +10,15 @@
     exist in the database updates that meal's macros instead of creating a duplicate.
 </p>
 
+<p>
+    You may also include an optional <code>Ingredients</code> column. List each ingredient
+    separated by <code>;</code>, with each one in <code>Quantity|Unit|Name</code> form (leave Unit
+    blank for countable items, e.g. <code>1||Egg</code>) - for example:
+    <code>200|g|Chicken breast;1||Egg;2|tbsp|Olive oil</code>. If the column is present it replaces
+    any existing ingredients for matched meals; omit it entirely to leave existing ingredients
+    untouched.
+</p>
+
 <div class="form__row">
     <label class="form__label" for="csv-file-input">Choose CSV file</label>
     <InputFile id="csv-file-input" class="form__control" OnChange="OnCsvFileSelected" accept=".csv" disabled="@IsUploading" />

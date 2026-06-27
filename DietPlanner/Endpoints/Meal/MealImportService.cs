@@ -50,6 +50,8 @@ public sealed class MealImportService : IMealImportService
         csvReader.Read();
         csvReader.ReadHeader();
 
+        bool hasIngredientsColumn = csvReader.HeaderRecord?.Contains("Ingredients", StringComparer.OrdinalIgnoreCase) ?? false;
+
         // CSV row 1 is the header, so the first data row is "row 2" from the user's point of view.
         int currentCsvRowNumber = 1;
 
@@ -77,7 +79,11 @@ public sealed class MealImportService : IMealImportService
                 string? zoeNotes = csvReader.GetField("ZoeNotes");
                 string? notes = csvReader.GetField("Notes");
 
-                parsedRows.Add(new MealImportRow(name, slotKey, kcal, proteinG, carbsG, fibreG, plants, mfName, zoeNotes, notes));
+                List<MealImportIngredientRow>? ingredients = hasIngredientsColumn
+                    ? ParseIngredients(csvReader.GetField("Ingredients"))
+                    : null;
+
+                parsedRows.Add(new MealImportRow(name, slotKey, kcal, proteinG, carbsG, fibreG, plants, mfName, zoeNotes, notes, ingredients));
             }
             catch (Exception ex) when (ex is FormatException or CsvHelperException)
             {
@@ -97,5 +103,43 @@ public sealed class MealImportService : IMealImportService
         }
 
         return parsedValue;
+    }
+
+    /// <summary>
+    /// Parses the optional Ingredients column: ingredients separated by ';', each one in
+    /// "Quantity|Unit|Name" form (Unit may be left blank, e.g. "1||Egg").
+    /// </summary>
+    private static List<MealImportIngredientRow> ParseIngredients(string? rawValue)
+    {
+        var ingredients = new List<MealImportIngredientRow>();
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return ingredients;
+        }
+
+        foreach (string entry in rawValue.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            string[] parts = entry.Split('|');
+            if (parts.Length != 3)
+            {
+                throw new FormatException($"Ingredient '{entry}' must be in 'Quantity|Unit|Name' format");
+            }
+
+            if (!decimal.TryParse(parts[0], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal quantity))
+            {
+                throw new FormatException($"Ingredient '{entry}' has a non-numeric quantity '{parts[0]}'");
+            }
+
+            string name = parts[2].Trim();
+            if (name.Length == 0)
+            {
+                throw new FormatException($"Ingredient '{entry}' is missing a name");
+            }
+
+            string? unit = string.IsNullOrWhiteSpace(parts[1]) ? null : parts[1].Trim();
+            ingredients.Add(new MealImportIngredientRow(name, quantity, unit));
+        }
+
+        return ingredients;
     }
 }
