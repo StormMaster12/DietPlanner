@@ -74,11 +74,22 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
 
     public async Task<MealImportResult> ImportFromPdfAsync(Stream pdfFileContent, CancellationToken cancellationToken)
     {
-        using MemoryStream bufferedContent = new();
-        await pdfFileContent.CopyToAsync(bufferedContent, cancellationToken);
-        bufferedContent.Position = 0;
+        // PdfPig needs a seekable stream. Callers that already hand us a fully-buffered, seekable
+        // stream (e.g. the in-memory job queue) get read directly; only non-seekable streams (e.g.
+        // a multipart form upload) get copied into a buffer, to avoid doubling peak memory usage
+        // for a large PDF.
+        MemoryStream? bufferedContent = null;
+        Stream pdfStream = pdfFileContent;
+        if (!pdfFileContent.CanSeek)
+        {
+            bufferedContent = new MemoryStream();
+            await pdfFileContent.CopyToAsync(bufferedContent, cancellationToken);
+            pdfStream = bufferedContent;
+        }
 
-        string extractedText = ExtractText(bufferedContent);
+        pdfStream.Position = 0;
+        string extractedText = ExtractText(pdfStream);
+        bufferedContent?.Dispose();
 
         if (string.IsNullOrWhiteSpace(extractedText))
         {
