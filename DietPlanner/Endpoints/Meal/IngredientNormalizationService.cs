@@ -18,15 +18,18 @@ public sealed partial class IngredientNormalizationService : IIngredientNormaliz
         should "garlic powder" entered with different capitalization, or "egg white" vs "egg whites".
 
         Rules:
-        - Only merge names that clearly refer to the exact same ingredient, just written
+        - Merge names that clearly refer to the exact same base ingredient, just written
           inconsistently (wording order, capitalization, singular/plural, minor punctuation,
           abbreviations). Pick whichever variant reads most naturally as the canonical spelling,
           using sentence case (capitalize only the first word and proper nouns, e.g. "Greek yogurt",
           "Cajun seasoning").
-        - Do NOT merge ingredients that are genuinely different foods or cuts/preparations with a
-          materially different nutritional or culinary identity, e.g. keep "ground turkey" and "extra
-          lean ground turkey" distinct, keep "chicken breast" and "grilled chicken breast" distinct,
-          keep "garlic", "garlic cloves" and "minced garlic" distinct.
+        - Also merge fat-content/leanness variants and cooking-state variants of the same base
+          ingredient onto the plain/base name, since these are still fundamentally the same shopping
+          item, e.g. "ground turkey" and "extra lean ground turkey" should both become "Ground
+          turkey"; "chicken breast" and "grilled chicken breast" should both become "Chicken breast".
+        - Do NOT merge ingredients that are genuinely different foods or different cuts/forms with a
+          materially different culinary identity, e.g. keep "garlic", "garlic cloves" and "minced
+          garlic" distinct, keep "chicken breast" and "chicken thigh" distinct.
         - If a name is already fine as-is, or has no clear duplicate in the list, return it unchanged
           (still include it in the output).
         - Every input name must appear exactly once in the output, in the same order.
