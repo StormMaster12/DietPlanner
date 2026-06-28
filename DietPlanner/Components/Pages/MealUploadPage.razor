@@ -85,6 +85,62 @@
     </div>
 }
 
+<h2>Normalize ingredient names</h2>
+
+<p>
+    Imported ingredient names are often inconsistent (e.g. "0% fat Greek yogurt" vs "0% Greek
+    yogurt"). This sends every distinct ingredient name to an AI model, which merges clear
+    near-duplicates onto one consistent spelling and rewrites the affected rows in place.
+</p>
+
+<div class="form__row">
+    <button type="button" class="btn btn--primary" disabled="@IsNormalizing" @onclick="StartNormalizeIngredients">
+        Normalize Ingredient Names
+    </button>
+</div>
+
+@if (IsNormalizing)
+{
+    <p>Normalizing ingredient names...</p>
+}
+
+@if (NormalizationErrorMessage is not null)
+{
+    <div class="alert alert--error">
+        <p>Something went wrong: @NormalizationErrorMessage</p>
+    </div>
+}
+
+@if (NormalizationResult is not null)
+{
+    <div class="alert @(NormalizationResult.Errors.Count > 0 ? "alert--error" : "alert--success")">
+        <p>
+            Considered @NormalizationResult.DistinctNamesConsidered distinct ingredient name(s) and
+            renamed @NormalizationResult.Renames.Count of them.
+        </p>
+
+        @if (NormalizationResult.Renames.Count > 0)
+        {
+            <ul>
+                @foreach (IngredientRename rename in NormalizationResult.Renames)
+                {
+                    <li>"@rename.OriginalName" &rarr; "@rename.NormalizedName" (@rename.AffectedCount row(s))</li>
+                }
+            </ul>
+        }
+
+        @if (NormalizationResult.Errors.Count > 0)
+        {
+            <ul>
+                @foreach (string normalizationError in NormalizationResult.Errors)
+                {
+                    <li>@normalizationError</li>
+                }
+            </ul>
+        }
+    </div>
+}
+
 @code {
     private const long MaxCsvUploadSizeBytes = 5 * 1024 * 1024;
     private const long MaxPdfUploadSizeBytes = 25 * 1024 * 1024;
@@ -98,13 +154,25 @@
     private IBrowserFile? SelectedPdfFile { get; set; }
     private Timer? _pdfPollTimer;
 
+    private bool IsNormalizing { get; set; }
+    private IngredientNormalizationResult? NormalizationResult { get; set; }
+    private string? NormalizationErrorMessage { get; set; }
+    private Timer? _normalizationPollTimer;
+
     [Inject]
     private IMealImportService MealImportService { get; set; } = null!;
 
     [Inject]
     private IMealPdfImportJobService MealPdfImportJobService { get; set; } = null!;
 
-    public void Dispose() => _pdfPollTimer?.Dispose();
+    [Inject]
+    private IIngredientNormalizationJobService IngredientNormalizationJobService { get; set; } = null!;
+
+    public void Dispose()
+    {
+        _pdfPollTimer?.Dispose();
+        _normalizationPollTimer?.Dispose();
+    }
 
     private void OnCsvFileSelected(InputFileChangeEventArgs changeEventArgs)
     {
@@ -210,6 +278,55 @@
             else
             {
                 ErrorMessage = status.ErrorMessage;
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private void StartNormalizeIngredients()
+    {
+        IsNormalizing = true;
+        NormalizationResult = null;
+        NormalizationErrorMessage = null;
+
+        try
+        {
+            // Start() returns immediately and runs the Anthropic call(s) on a detached background
+            // task for the same reason as the PDF import job: it can take longer than we'd want to
+            // hold a SignalR request open for.
+            Guid jobId = IngredientNormalizationJobService.Start();
+            _normalizationPollTimer = new Timer(_ => PollNormalizationJob(jobId), null, PdfPollInterval, PdfPollInterval);
+        }
+        catch (Exception ex)
+        {
+            LogNormalizationFailed(ex);
+            NormalizationErrorMessage = ex.Message;
+            IsNormalizing = false;
+        }
+    }
+
+    private void PollNormalizationJob(Guid jobId)
+    {
+        IngredientNormalizationJobStatusView? status = IngredientNormalizationJobService.GetStatus(jobId);
+        if (status is null || status.Status == IngredientNormalizationJobStatus.Running)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(() =>
+        {
+            _normalizationPollTimer?.Dispose();
+            _normalizationPollTimer = null;
+            IsNormalizing = false;
+
+            if (status.Status == IngredientNormalizationJobStatus.Completed)
+            {
+                NormalizationResult = status.Result;
+            }
+            else
+            {
+                NormalizationErrorMessage = status.ErrorMessage;
             }
 
             StateHasChanged();
