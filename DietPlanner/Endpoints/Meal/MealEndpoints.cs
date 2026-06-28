@@ -17,6 +17,8 @@ public static class MealsEndpoints
         group.MapPut("/", UpsertMealAsync).WithOpenApi();
         group.MapDelete("/{mealId}", DeleteMealAsync).WithOpenApi();
         group.MapPost("/import-pdf", ImportMealsFromPdfAsync).WithOpenApi().DisableAntiforgery();
+        group.MapPost("/normalize-ingredients", StartNormalizeIngredients).WithOpenApi().DisableAntiforgery();
+        group.MapGet("/normalize-ingredients/{jobId}", GetNormalizeIngredientsStatus).WithOpenApi();
 
         return endpoints;
     }
@@ -69,5 +71,15 @@ public static class MealsEndpoints
         await using Stream pdfFileStream = file.OpenReadStream();
         MealImportResult result = await mealPdfImportService.ImportFromPdfAsync(pdfFileStream, cancellationToken);
         return TypedResults.Ok(result);
+    }
+
+    public static Ok<Guid> StartNormalizeIngredients([FromServices] IIngredientNormalizationJobService normalizationJobService)
+        => TypedResults.Ok(normalizationJobService.Start());
+
+    public static Results<Ok<IngredientNormalizationJobStatusView>, NotFound> GetNormalizeIngredientsStatus(
+        [FromRoute] Guid jobId, [FromServices] IIngredientNormalizationJobService normalizationJobService)
+    {
+        IngredientNormalizationJobStatusView? status = normalizationJobService.GetStatus(jobId);
+        return status is null ? TypedResults.NotFound() : TypedResults.Ok(status);
     }
 }

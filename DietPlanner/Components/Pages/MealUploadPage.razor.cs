@@ -16,4 +16,7 @@ public partial class MealUploadPage
 
     private void LogPdfImportFailed(Exception exception, string fileName) =>
         Logger.LogError(exception, "PDF meal import failed for file '{FileName}'", fileName);
+
+    private void LogNormalizationFailed(Exception exception) =>
+        Logger.LogError(exception, "Ingredient name normalization failed to start");
 }
