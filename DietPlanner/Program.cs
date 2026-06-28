@@ -72,6 +72,11 @@ services.AddScoped<ISettingsService, SettingsService>()
 services.Configure<AnthropicOptions>(builder.Configuration.GetSection(AnthropicOptions.SectionName));
 services.AddHttpClient<IMealPdfImportService, MealPdfImportService>();
 
+// Runs PDF imports on a detached background task so a slow multi-chunk Anthropic extraction
+// doesn't hold the Blazor circuit's request open long enough to hit a SignalR/proxy timeout;
+// the upload page polls this singleton for job status instead of awaiting the import inline.
+services.AddSingleton<IMealPdfImportJobService, MealPdfImportJobService>();
+
 // Default DataProtection key storage is ephemeral (in-memory/local temp dir). Combined with
 // auto_stop_machines/min_machines_running=0 in fly.toml, every cold start spun up a brand new
 // key ring, so antiforgery cookies issued before the previous stop could never be decrypted

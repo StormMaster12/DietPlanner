@@ -1,4 +1,5 @@
 @page "/meals/upload"
+@implements IDisposable
 
 <h1>Upload Meals</h1>
 
@@ -87,6 +88,7 @@
 @code {
     private const long MaxCsvUploadSizeBytes = 5 * 1024 * 1024;
     private const long MaxPdfUploadSizeBytes = 25 * 1024 * 1024;
+    private static readonly TimeSpan PdfPollInterval = TimeSpan.FromSeconds(3);
 
     private bool IsUploading { get; set; }
     private MealImportResult? ImportResult { get; set; }
@@ -94,12 +96,15 @@
     private string? UploadingFileName { get; set; }
     private IBrowserFile? SelectedCsvFile { get; set; }
     private IBrowserFile? SelectedPdfFile { get; set; }
+    private Timer? _pdfPollTimer;
 
     [Inject]
     private IMealImportService MealImportService { get; set; } = null!;
 
     [Inject]
-    private IMealPdfImportService MealPdfImportService { get; set; } = null!;
+    private IMealPdfImportJobService MealPdfImportJobService { get; set; } = null!;
+
+    public void Dispose() => _pdfPollTimer?.Dispose();
 
     private void OnCsvFileSelected(InputFileChangeEventArgs changeEventArgs)
     {
@@ -151,25 +156,63 @@
             return;
         }
 
-        UploadingFileName = SelectedPdfFile.Name;
+        string fileName = SelectedPdfFile.Name;
+        UploadingFileName = fileName;
         IsUploading = true;
         ImportResult = null;
         ErrorMessage = null;
 
         try
         {
-            await using Stream uploadedFileStream = SelectedPdfFile.OpenReadStream(MaxPdfUploadSizeBytes);
-            ImportResult = await MealPdfImportService.ImportFromPdfAsync(uploadedFileStream, CancellationToken.None);
+            byte[] pdfBytes;
+            await using (Stream uploadedFileStream = SelectedPdfFile.OpenReadStream(MaxPdfUploadSizeBytes))
+            using (MemoryStream buffer = new())
+            {
+                await uploadedFileStream.CopyToAsync(buffer);
+                pdfBytes = buffer.ToArray();
+            }
+
+            // Started detached from this circuit's request so a slow multi-chunk extraction can't
+            // hold this method's await open long enough to hit a SignalR/proxy timeout; the page
+            // polls for the result instead.
+            Guid jobId = MealPdfImportJobService.Start(pdfBytes);
+
+            _pdfPollTimer = new Timer(_ => PollPdfJob(jobId), null, PdfPollInterval, PdfPollInterval);
         }
         catch (Exception ex)
         {
-            LogPdfImportFailed(ex, SelectedPdfFile.Name);
+            LogPdfImportFailed(ex, fileName);
             ErrorMessage = ex.Message;
-        }
-        finally
-        {
             IsUploading = false;
             UploadingFileName = null;
         }
+    }
+
+    private void PollPdfJob(Guid jobId)
+    {
+        MealPdfImportJobStatusView? status = MealPdfImportJobService.GetStatus(jobId);
+        if (status is null || status.Status == MealPdfImportJobStatus.Running)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(() =>
+        {
+            _pdfPollTimer?.Dispose();
+            _pdfPollTimer = null;
+            IsUploading = false;
+            UploadingFileName = null;
+
+            if (status.Status == MealPdfImportJobStatus.Completed)
+            {
+                ImportResult = status.Result;
+            }
+            else
+            {
+                ErrorMessage = status.ErrorMessage;
+            }
+
+            StateHasChanged();
+        });
     }
 }
