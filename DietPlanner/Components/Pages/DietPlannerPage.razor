@@ -160,17 +160,36 @@ else
     /// <summary>
     /// Combines every ingredient across every meal in the week, summing the quantities of any
     /// ingredients that share the same name and unit (e.g. two different meals both calling for
-    /// "g" of "Chicken breast" become a single combined shopping-list line).
+    /// "g" of "Chicken breast" become a single combined shopping-list line). Mass/volume units
+    /// (cup, tbsp, tsp, oz, lb, ml, l, etc.) are first converted to grams so the same ingredient
+    /// logged with different units still combines into one line instead of several duplicates.
     /// </summary>
     private static List<DayPlanIngredientDto> BuildWeeklyShoppingList(List<DayPlanResponseDto> dayPlans)
     {
         return dayPlans
             .SelectMany(d => d.Meals)
             .SelectMany(m => m.Ingredients)
+            .Select(NormalizeIngredientUnit)
             .GroupBy(i => (i.Name, i.Unit))
-            .Select(g => new DayPlanIngredientDto(g.Key.Name, g.Sum(i => i.Quantity), g.Key.Unit))
+            .Select(g => new DayPlanIngredientDto(g.Key.Name, RoundForDisplay(g.Sum(i => i.Quantity), g.Key.Unit), g.Key.Unit))
             .OrderBy(i => i.Name)
             .ToList();
+    }
+
+    /// <summary>Converts an ingredient's quantity to grams when its unit is a recognized mass/volume unit, leaving countable ingredients unchanged.</summary>
+    private static DayPlanIngredientDto NormalizeIngredientUnit(DayPlanIngredientDto ingredient)
+    {
+        (decimal Quantity, string Unit)? converted = IngredientUnitConverter.TryConvertToGrams(ingredient.Name, ingredient.Quantity, ingredient.Unit);
+
+        return converted is null
+            ? ingredient
+            : ingredient with { Quantity = converted.Value.Quantity, Unit = converted.Value.Unit };
+    }
+
+    /// <summary>Rounds gram quantities to the nearest whole gram for a cleaner shopping-list display; other units keep their original precision.</summary>
+    private static decimal RoundForDisplay(decimal quantity, string? unit)
+    {
+        return unit == "g" ? Math.Round(quantity, 0, MidpointRounding.AwayFromZero) : quantity;
     }
 
     private static string FormatIngredientLine(DayPlanIngredientDto ingredient)
