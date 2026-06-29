@@ -8,10 +8,37 @@
     &__day {
         margin-bottom: var(--space-8);
     }
+
+    &__tabs {
+        display: flex;
+        gap: var(--space-2);
+        border-bottom: 1px solid var(--color-border);
+        margin-bottom: var(--space-4);
+    }
+
+    &__tab {
+        padding: var(--space-2) var(--space-4);
+        border: none;
+        background: none;
+        cursor: pointer;
+        font-weight: 600;
+        color: var(--color-text);
+        border-bottom: 2px solid transparent;
+
+        &--active {
+            border-bottom-color: var(--color-primary);
+            color: var(--color-primary);
+        }
+    }
 }
 
 .shopping-list {
     margin-bottom: var(--space-8);
+
+    &__aisle {
+        margin-top: var(--space-4);
+        margin-bottom: var(--space-2);
+    }
 
     &__items {
         margin-bottom: var(--space-3);
