@@ -86,8 +86,8 @@ dotnet run --project DietPlanner/DietPlanner.csproj
 
 This mirrors `.github/workflows/ci.yml` exactly, which runs on every PR and on push to
 `master`: restore → build → unit tests → build E2E project → install Playwright
-Chromium → run E2E tests. On push to `master` (after tests pass) it also builds and
-pushes the Docker image to `ghcr.io/<repo>:latest` / `:<sha>`.
+Chromium → run E2E tests. On push to `master` (after tests pass) it also deploys to
+Fly.io via `flyctl deploy --remote-only`.
 
 ### Unit tests (`DietPlanner.Tests`)
 
@@ -131,9 +131,8 @@ pushes the Docker image to `ghcr.io/<repo>:latest` / `:<sha>`.
 
 Single Fly.io app (`fly.toml`: app `dieting-app`, region `iad`, 1 always-on
 shared-cpu-1x machine, SQLite + DataProtection keys on a mounted volume so both survive
-restarts). CI builds and pushes `ghcr.io/<repo>:latest` on every merge to `master`; Fly
-deploys are not done by CI in this repo — check with the user before assuming a deploy
-should happen automatically.
+restarts). CI deploys to Fly.io via `flyctl deploy --remote-only` on every merge to
+`master` (after tests pass), using the `FLY_API_TOKEN` repo secret.
 
 ## Working in this repo
 
