@@ -73,6 +73,7 @@ services.Configure<AnthropicOptions>(builder.Configuration.GetSection(AnthropicO
 services.AddHttpClient<IMealPdfImportService, MealPdfImportService>();
 services.AddHttpClient<IIngredientNormalizationService, IngredientNormalizationService>();
 services.AddHttpClient<IIngredientGroupingService, IngredientGroupingService>();
+services.AddHttpClient<IMealAdditionSuggestionService, MealAdditionSuggestionService>();
 
 // Runs PDF imports / ingredient normalization on a detached background task so a slow multi-chunk
 // Anthropic call doesn't hold the Blazor circuit's request open long enough to hit a SignalR/proxy

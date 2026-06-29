@@ -95,6 +95,23 @@ h3 {
 .btn--secondary:hover {
   background-color: var(--color-bg-page);
 }
+.btn--link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-primary);
+  font-weight: 600;
+  font-size: inherit;
+  text-decoration: underline;
+}
+.btn--link:hover {
+  color: var(--color-primary-hover);
+}
+.btn--link:disabled {
+  color: var(--color-text);
+  cursor: default;
+  text-decoration: none;
+}
 
 .alert {
   padding: var(--space-3) var(--space-4);

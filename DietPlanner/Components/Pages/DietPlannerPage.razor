@@ -66,13 +66,46 @@ else
                     {
                         <tr>
                             <td>@meal.SlotKey</td>
-                            <td>@meal.Name</td>
+                            <td>
+                                @meal.Name
+                                @if (IsShortOnFibreOrPlants(dayPlan))
+                                {
+                                    <button class="btn btn--link" @onclick="@(() => SuggestAdditionsAsync(dayPlan, meal))" disabled="@IsSuggestingAdditions">
+                                        @(IsSuggestingAdditions && SuggestingForMealId == meal.MealId ? "Thinking..." : "Suggest additions")
+                                    </button>
+                                }
+                            </td>
                             <td class="table__value--numeric">@meal.Kcal</td>
                             <td class="table__value--numeric">@meal.ProteinG</td>
                             <td class="table__value--numeric">@meal.CarbsG</td>
                             <td class="table__value--numeric">@meal.FibreG</td>
                             <td class="table__value--numeric">@meal.Plants</td>
                         </tr>
+                        @if (SuggestionsByMealId.TryGetValue(meal.MealId, out MealAdditionSuggestionResult? suggestionResult))
+                        {
+                            <tr>
+                                <td></td>
+                                <td colspan="6" class="meal-suggestions">
+                                    @if (suggestionResult.Errors.Count > 0)
+                                    {
+                                        <div class="alert alert--error">@string.Join(" ", suggestionResult.Errors)</div>
+                                    }
+                                    else if (suggestionResult.Suggestions.Count == 0)
+                                    {
+                                        <p>No additions suggested.</p>
+                                    }
+                                    else
+                                    {
+                                        <ul class="meal-suggestions__list">
+                                            @foreach (SuggestedMealAddition suggestion in suggestionResult.Suggestions)
+                                            {
+                                                <li><strong>@suggestion.Amount @suggestion.Ingredient</strong> - @suggestion.Reason</li>
+                                            }
+                                        </ul>
+                                    }
+                                </td>
+                            </tr>
+                        }
                     }
                 </tbody>
                 <tfoot>
@@ -170,6 +203,12 @@ else
     private string? CopyStatusMessage { get; set; }
     private string? GroupingErrorMessage { get; set; }
 
+    private bool IsSuggestingAdditions { get; set; }
+    private Guid? SuggestingForMealId { get; set; }
+
+    /// <summary>The most recent AI-suggested additions per meal, keyed by meal ID.</summary>
+    private Dictionary<Guid, MealAdditionSuggestionResult> SuggestionsByMealId { get; set; } = new();
+
     private const int DaysInWeek = 7;
 
     [Inject]
@@ -180,6 +219,9 @@ else
 
     [Inject]
     private IIngredientGroupingService GroupingService { get; set; } = null!;
+
+    [Inject]
+    private IMealAdditionSuggestionService MealAdditionSuggestionService { get; set; } = null!;
 
     [Inject]
     private IJSRuntime JsRuntime { get; set; } = null!;
@@ -205,6 +247,43 @@ else
         GroupedShoppingList = null;
         GroupingErrorMessage = null;
         CopyStatusMessage = null;
+        SuggestionsByMealId = new();
+    }
+
+    /// <summary>True once the day's running totals have fallen below either its fibre or plants target.</summary>
+    private static bool IsShortOnFibreOrPlants(DayPlanResponseDto dayPlan)
+    {
+        return dayPlan.Remaining.FibreG > 0 || dayPlan.Remaining.Plants > 0;
+    }
+
+    /// <summary>
+    /// Sends this meal's name, notes and ingredients to the AI suggestion service, along with how
+    /// far the day is below its fibre/plant targets, and stores the result for display under the
+    /// meal's row.
+    /// </summary>
+    private async Task SuggestAdditionsAsync(DayPlanResponseDto dayPlan, DayPlanMealDto meal)
+    {
+        IsSuggestingAdditions = true;
+        SuggestingForMealId = meal.MealId;
+
+        try
+        {
+            MealAdditionSuggestionRequest request = new(
+                meal.Name,
+                meal.ZoeNotes,
+                meal.Notes,
+                meal.Ingredients,
+                Math.Max(0, dayPlan.Remaining.FibreG),
+                Math.Max(0, dayPlan.Remaining.Plants));
+
+            MealAdditionSuggestionResult result = await MealAdditionSuggestionService.SuggestAdditionsAsync(request, CancellationToken.None);
+            SuggestionsByMealId[meal.MealId] = result;
+        }
+        finally
+        {
+            IsSuggestingAdditions = false;
+            SuggestingForMealId = null;
+        }
     }
 
     /// <summary>
