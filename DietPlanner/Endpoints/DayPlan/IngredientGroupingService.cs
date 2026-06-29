@@ -28,7 +28,8 @@ public sealed partial class IngredientGroupingService : IIngredientGroupingServi
         "Other",
     ];
 
-    private static readonly string SystemPrompt = $"""
+    private static readonly string SystemPrompt =
+        """
         You turn a home cook's weekly shopping list into something they can use in a supermarket.
 
         You are given a JSON array of ingredient lines, each with an index, a name, a quantity and a
@@ -46,11 +47,14 @@ public sealed partial class IngredientGroupingService : IIngredientGroupingServi
            - Always return a single number of grams, rounded to the nearest whole gram. Never leave
              a line unconverted.
         2. Assign the ingredient to exactly one supermarket aisle from this fixed list:
-           {string.Join(", ", Categories.Select(c => $"\"{c}\""))}
+        """
+        + " " + string.Join(", ", Categories.Select(c => $"\"{c}\"")) +
+        """
+
 
         Respond with ONLY a raw JSON array, one object per input line, no markdown fences, no
         commentary, in this exact shape:
-        [{{"index": <the input index>, "grams": <integer>, "category": "<one of the aisles above>"}}]
+        [{"index": <the input index>, "grams": <integer>, "category": "<one of the aisles above>"}]
 
         Every input index must appear exactly once in the output, in the same order.
         """;
