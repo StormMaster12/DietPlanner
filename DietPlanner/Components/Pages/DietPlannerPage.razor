@@ -269,6 +269,7 @@ else
         try
         {
             MealAdditionSuggestionRequest request = new(
+                meal.MealId,
                 meal.Name,
                 meal.ZoeNotes,
                 meal.Notes,
@@ -298,7 +299,7 @@ else
 
         try
         {
-            IngredientGroupingResult result = await GroupingService.GroupIngredientsAsync(WeeklyShoppingList, CancellationToken.None);
+            IngredientGroupingResult result = await GroupingService.GroupIngredientsAsync(WeekStartDate, WeeklyShoppingList, CancellationToken.None);
 
             GroupedShoppingList = result.Ingredients
                 .GroupBy(i => i.Category)

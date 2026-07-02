@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DietPlanner.Endpoints.Meal;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -63,12 +64,15 @@ public sealed partial class IngredientGroupingService : IIngredientGroupingServi
 
     private readonly HttpClient _httpClient;
     private readonly AnthropicOptions _options;
+    private readonly AppDbContext _db;
     private readonly ILogger<IngredientGroupingService> _logger;
 
-    public IngredientGroupingService(HttpClient httpClient, IOptions<AnthropicOptions> options, ILogger<IngredientGroupingService> logger)
+    public IngredientGroupingService(
+        HttpClient httpClient, IOptions<AnthropicOptions> options, AppDbContext db, ILogger<IngredientGroupingService> logger)
     {
         _httpClient = httpClient;
         _options = options.Value;
+        _db = db;
         _logger = logger;
     }
 
@@ -76,11 +80,23 @@ public sealed partial class IngredientGroupingService : IIngredientGroupingServi
     private partial void LogAnthropicCallFailed(Exception exception);
 
     public async Task<IngredientGroupingResult> GroupIngredientsAsync(
-        IReadOnlyList<DayPlanIngredientDto> ingredients, CancellationToken cancellationToken)
+        DateOnly weekStartDate, IReadOnlyList<DayPlanIngredientDto> ingredients, CancellationToken cancellationToken)
     {
         if (ingredients.Count == 0)
         {
             return new IngredientGroupingResult([], []);
+        }
+
+        string fingerprint = JsonSerializer.Serialize(ingredients);
+
+        ShoppingListGroupingCacheEntry? cached = await _db.ShoppingListGroupingCache
+            .FirstOrDefaultAsync(c => c.WeekStartDate == weekStartDate, cancellationToken);
+
+        if (cached is not null && cached.RequestFingerprint == fingerprint)
+        {
+            return new IngredientGroupingResult(
+                JsonSerializer.Deserialize<List<GroupedIngredientDto>>(cached.GroupedJson) ?? [],
+                JsonSerializer.Deserialize<List<string>>(cached.ErrorsJson) ?? []);
         }
 
         if (string.IsNullOrWhiteSpace(_options.ApiKey))
@@ -120,7 +136,43 @@ public sealed partial class IngredientGroupingService : IIngredientGroupingServi
             }
         }
 
-        return new IngredientGroupingResult(grouped, errors);
+        var groupingResult = new IngredientGroupingResult(grouped, errors);
+
+        if (errors.Count == 0)
+        {
+            await SaveToCacheAsync(weekStartDate, fingerprint, groupingResult, cached, cancellationToken);
+        }
+
+        return groupingResult;
+    }
+
+    private async Task SaveToCacheAsync(
+        DateOnly weekStartDate, string fingerprint, IngredientGroupingResult result, ShoppingListGroupingCacheEntry? existing,
+        CancellationToken cancellationToken)
+    {
+        string groupedJson = JsonSerializer.Serialize(result.Ingredients);
+        string errorsJson = JsonSerializer.Serialize(result.Errors);
+
+        if (existing is not null)
+        {
+            existing.RequestFingerprint = fingerprint;
+            existing.GroupedJson = groupedJson;
+            existing.ErrorsJson = errorsJson;
+            existing.CreatedAtUtc = DateTime.UtcNow;
+        }
+        else
+        {
+            _db.ShoppingListGroupingCache.Add(new ShoppingListGroupingCacheEntry
+            {
+                WeekStartDate = weekStartDate,
+                RequestFingerprint = fingerprint,
+                GroupedJson = groupedJson,
+                ErrorsJson = errorsJson,
+                CreatedAtUtc = DateTime.UtcNow,
+            });
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
     }
 
     private async Task<List<GroupedLineResult>> CallAnthropicAsync(
