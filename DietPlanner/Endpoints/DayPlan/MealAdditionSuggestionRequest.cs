@@ -5,6 +5,7 @@ namespace DietPlanner.Endpoints.DayPlan;
 /// targets, sent to an LLM so it can suggest additions that close the gap.
 /// </summary>
 public sealed record MealAdditionSuggestionRequest(
+    Guid MealId,
     string MealName,
     string? ZoeNotes,
     string? Notes,

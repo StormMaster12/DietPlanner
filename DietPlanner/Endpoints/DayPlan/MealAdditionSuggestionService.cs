@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DietPlanner.Endpoints.Meal;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -30,12 +31,15 @@ public sealed partial class MealAdditionSuggestionService : IMealAdditionSuggest
 
     private readonly HttpClient _httpClient;
     private readonly AnthropicOptions _options;
+    private readonly AppDbContext _db;
     private readonly ILogger<MealAdditionSuggestionService> _logger;
 
-    public MealAdditionSuggestionService(HttpClient httpClient, IOptions<AnthropicOptions> options, ILogger<MealAdditionSuggestionService> logger)
+    public MealAdditionSuggestionService(
+        HttpClient httpClient, IOptions<AnthropicOptions> options, AppDbContext db, ILogger<MealAdditionSuggestionService> logger)
     {
         _httpClient = httpClient;
         _options = options.Value;
+        _db = db;
         _logger = logger;
     }
 
@@ -45,6 +49,18 @@ public sealed partial class MealAdditionSuggestionService : IMealAdditionSuggest
     public async Task<MealAdditionSuggestionResult> SuggestAdditionsAsync(
         MealAdditionSuggestionRequest request, CancellationToken cancellationToken)
     {
+        string fingerprint = BuildRequestFingerprint(request);
+
+        MealAdditionSuggestionCacheEntry? cached = await _db.MealAdditionSuggestionCache
+            .FirstOrDefaultAsync(c => c.MealId == request.MealId, cancellationToken);
+
+        if (cached is not null && cached.RequestFingerprint == fingerprint)
+        {
+            return new MealAdditionSuggestionResult(
+                JsonSerializer.Deserialize<List<SuggestedMealAddition>>(cached.SuggestionsJson) ?? [],
+                JsonSerializer.Deserialize<List<string>>(cached.ErrorsJson) ?? []);
+        }
+
         if (string.IsNullOrWhiteSpace(_options.ApiKey))
         {
             return new MealAdditionSuggestionResult([], ["Meal addition suggestions are not configured: missing Anthropic API key."]);
@@ -52,12 +68,14 @@ public sealed partial class MealAdditionSuggestionService : IMealAdditionSuggest
 
         try
         {
-            List<SuggestedAdditionResult> results = await CallAnthropicAsync(request, cancellationToken);
+            List<SuggestedAdditionResult> results = await CallAnthropicAsync(fingerprint, cancellationToken);
             List<SuggestedMealAddition> suggestions = results
                 .Select(r => new SuggestedMealAddition(r.Ingredient, r.Amount, r.Reason))
                 .ToList();
 
-            return new MealAdditionSuggestionResult(suggestions, []);
+            var result = new MealAdditionSuggestionResult(suggestions, []);
+            await SaveToCacheAsync(request.MealId, fingerprint, result, cached, cancellationToken);
+            return result;
         }
         catch (Exception ex) when (ex is HttpRequestException or JsonException)
         {
@@ -66,8 +84,12 @@ public sealed partial class MealAdditionSuggestionService : IMealAdditionSuggest
         }
     }
 
-    private async Task<List<SuggestedAdditionResult>> CallAnthropicAsync(
-        MealAdditionSuggestionRequest request, CancellationToken cancellationToken)
+    /// <summary>
+    /// Serializes the exact payload that would be sent to the Anthropic API so it can double as
+    /// both the request body and a cache-invalidation fingerprint: identical meal contents and
+    /// shortfall produce an identical fingerprint, so a repeat request can skip the API call.
+    /// </summary>
+    private static string BuildRequestFingerprint(MealAdditionSuggestionRequest request)
     {
         var userPayload = new RequestPayload(
             request.MealName,
@@ -76,8 +98,40 @@ public sealed partial class MealAdditionSuggestionService : IMealAdditionSuggest
             request.Ingredients.Select(i => new RequestIngredient(i.Name, i.Quantity, i.Unit)).ToList(),
             request.FibreShortfallG,
             request.PlantsShortfall);
-        string userContent = JsonSerializer.Serialize(userPayload);
+        return JsonSerializer.Serialize(userPayload);
+    }
 
+    private async Task SaveToCacheAsync(
+        Guid mealId, string fingerprint, MealAdditionSuggestionResult result, MealAdditionSuggestionCacheEntry? existing,
+        CancellationToken cancellationToken)
+    {
+        string suggestionsJson = JsonSerializer.Serialize(result.Suggestions);
+        string errorsJson = JsonSerializer.Serialize(result.Errors);
+
+        if (existing is not null)
+        {
+            existing.RequestFingerprint = fingerprint;
+            existing.SuggestionsJson = suggestionsJson;
+            existing.ErrorsJson = errorsJson;
+            existing.CreatedAtUtc = DateTime.UtcNow;
+        }
+        else
+        {
+            _db.MealAdditionSuggestionCache.Add(new MealAdditionSuggestionCacheEntry
+            {
+                MealId = mealId,
+                RequestFingerprint = fingerprint,
+                SuggestionsJson = suggestionsJson,
+                ErrorsJson = errorsJson,
+                CreatedAtUtc = DateTime.UtcNow,
+            });
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<List<SuggestedAdditionResult>> CallAnthropicAsync(string userContent, CancellationToken cancellationToken)
+    {
         var requestBody = new AnthropicRequest(
             _options.Model,
             2048,
