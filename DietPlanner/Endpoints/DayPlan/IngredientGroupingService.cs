@@ -136,14 +136,14 @@ public sealed partial class IngredientGroupingService : IIngredientGroupingServi
             }
         }
 
-        var result = new IngredientGroupingResult(grouped, errors);
+        var groupingResult = new IngredientGroupingResult(grouped, errors);
 
         if (errors.Count == 0)
         {
-            await SaveToCacheAsync(weekStartDate, fingerprint, result, cached, cancellationToken);
+            await SaveToCacheAsync(weekStartDate, fingerprint, groupingResult, cached, cancellationToken);
         }
 
-        return result;
+        return groupingResult;
     }
 
     private async Task SaveToCacheAsync(
