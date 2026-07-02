@@ -25,7 +25,7 @@ public sealed class MealAdditionSuggestionServiceTests
         _testDatabase.Dispose();
     }
 
-    private MealAdditionSuggestionService CreateService(StubHttpMessageHandler handler, string apiKey = "test-key")
+    private MealAdditionSuggestionService CreateService(HttpMessageHandler handler, string apiKey = "test-key")
     {
         HttpClient httpClient = new(handler);
         IOptions<AnthropicOptions> options = Options.Create(new AnthropicOptions { ApiKey = apiKey, Model = "claude-sonnet-4-6" });
@@ -118,6 +118,29 @@ public sealed class MealAdditionSuggestionServiceTests
         Assert.That(handler.CallCount, Is.EqualTo(2));
     }
 
+    [Test]
+    public async Task SuggestAdditionsAsync_AfterAnthropicCallFails_RetriesOnNextRequest()
+    {
+        Guid mealId = Guid.NewGuid();
+        SequencedHttpMessageHandler handler = new(
+            () => new HttpResponseMessage(HttpStatusCode.InternalServerError) { Content = new StringContent("boom") },
+            () => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    BuildAnthropicResponse("""[{"ingredient":"Chia seeds","amount":"1 tbsp","reason":"Adds fibre."}]"""),
+                    Encoding.UTF8, "application/json")
+            });
+
+        MealAdditionSuggestionResult first = await CreateService(handler).SuggestAdditionsAsync(BuildRequest(mealId), CancellationToken.None);
+        MealAdditionSuggestionResult second = await CreateService(handler).SuggestAdditionsAsync(BuildRequest(mealId), CancellationToken.None);
+
+        Assert.That(first.Suggestions, Is.Empty);
+        Assert.That(first.Errors, Has.Count.EqualTo(1));
+        Assert.That(handler.CallCount, Is.EqualTo(2));
+        Assert.That(second.Errors, Is.Empty);
+        Assert.That(second.Suggestions, Has.Count.EqualTo(1));
+    }
+
     private sealed class StubHttpMessageHandler : HttpMessageHandler
     {
         private readonly string _responseBody;
@@ -137,6 +160,26 @@ public sealed class MealAdditionSuggestionServiceTests
                 Content = new StringContent(_responseBody, Encoding.UTF8, "application/json")
             };
             return Task.FromResult(response);
+        }
+    }
+
+    /// <summary>Returns a different stubbed response on each successive call, so tests can simulate a failure followed by a retry succeeding.</summary>
+    private sealed class SequencedHttpMessageHandler : HttpMessageHandler
+    {
+        private readonly Func<HttpResponseMessage>[] _responses;
+
+        public int CallCount { get; private set; }
+
+        public SequencedHttpMessageHandler(params Func<HttpResponseMessage>[] responses)
+        {
+            _responses = responses;
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            int index = Math.Min(CallCount, _responses.Length - 1);
+            CallCount++;
+            return Task.FromResult(_responses[index]());
         }
     }
 }
