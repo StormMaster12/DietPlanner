@@ -279,8 +279,16 @@ else
                     Math.Max(0, dayPlan.Remaining.FibreG),
                     Math.Max(0, dayPlan.Remaining.Plants));
 
-                MealAdditionSuggestionResult result = await MealAdditionSuggestionService.SuggestAdditionsAsync(request, CancellationToken.None);
-                SuggestionsByMealId[meal.MealId] = result;
+                try
+                {
+                    SuggestionsByMealId[meal.MealId] = await MealAdditionSuggestionService.SuggestAdditionsAsync(request, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    SuggestionsByMealId[meal.MealId] = new MealAdditionSuggestionResult([], [$"Could not get suggestions for '{meal.Name}': {ex.Message}"]);
+                }
+
+                StateHasChanged();
             }
         }
         finally
