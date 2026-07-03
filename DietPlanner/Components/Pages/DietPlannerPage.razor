@@ -9,9 +9,9 @@
 </p>
 
 <div class="week-plan__toolbar">
-    <button class="btn btn--secondary" @onclick="GoToPreviousWeekAsync" disabled="@IsBusy">&laquo; Previous week</button>
-    <button class="btn btn--secondary" @onclick="GoToNextWeekAsync" disabled="@IsBusy">Next week &raquo;</button>
-    <button class="btn btn--primary" @onclick="GenerateWeekAsync" disabled="@IsBusy">
+    <button class="btn btn--secondary" @onclick="GoToPreviousWeekAsync" disabled="@IsDbBusy">&laquo; Previous week</button>
+    <button class="btn btn--secondary" @onclick="GoToNextWeekAsync" disabled="@IsDbBusy">Next week &raquo;</button>
+    <button class="btn btn--primary" @onclick="GenerateWeekAsync" disabled="@IsDbBusy">
         @(IsBusy ? "Generating..." : "Generate random week")
     </button>
 </div>
@@ -52,7 +52,7 @@ else
 
             @if (IsShortOnFibreOrPlants(dayPlan))
             {
-                <button class="btn btn--link" @onclick="@(() => SuggestAllAdditionsAsync(dayPlan))" disabled="@(DatesSuggestingAdditions.Count > 0)">
+                <button class="btn btn--link" @onclick="@(() => SuggestAllAdditionsAsync(dayPlan))" disabled="@IsDbBusy">
                     @(DatesSuggestingAdditions.Contains(dayPlan.Date) ? "Thinking..." : "Suggest additions for all meals")
                 </button>
             }
@@ -144,7 +144,7 @@ else
             }
             else
             {
-                <button class="btn btn--primary" @onclick="GroupShoppingListAsync" disabled="@IsGroupingShoppingList">
+                <button class="btn btn--primary" @onclick="GroupShoppingListAsync" disabled="@IsDbBusy">
                     @(IsGroupingShoppingList ? "Grouping..." : (GroupedShoppingList is null ? "Group by aisle" : "Regroup by aisle"))
                 </button>
 
@@ -211,6 +211,13 @@ else
     /// <see cref="AppDbContext"/> with every other day's loop via <see cref="MealAdditionSuggestionService"/>.
     /// </summary>
     private HashSet<DateOnly> DatesSuggestingAdditions { get; set; } = new();
+
+    /// <summary>
+    /// True while week generation, shopping-list grouping, or bulk suggestions is in flight, so
+    /// every button backed by the page's scoped <see cref="AppDbContext"/> can be disabled and
+    /// none of those operations overlap on the same context.
+    /// </summary>
+    private bool IsDbBusy => IsBusy || IsGroupingShoppingList || DatesSuggestingAdditions.Count > 0;
 
     /// <summary>The most recent AI-suggested additions per meal, keyed by meal ID.</summary>
     private Dictionary<Guid, MealAdditionSuggestionResult> SuggestionsByMealId { get; set; } = new();
