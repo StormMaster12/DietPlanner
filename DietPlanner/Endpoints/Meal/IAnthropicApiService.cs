@@ -25,7 +25,7 @@ public interface IAnthropicApiService
     /// (stop_reason "max_tokens") - callers know best how to advise the user to work around this
     /// for their specific request shape (e.g. "split the PDF into smaller files").
     /// </param>
-    /// <exception cref="HttpRequestException">The API returned a non-success status code.</exception>
+    /// <exception cref="HttpRequestException">No API key is configured, or the API returned a non-success status code.</exception>
     /// <exception cref="JsonException">The response had no text content, or was truncated.</exception>
     Task<string> SendMessageAsync(
         string systemPrompt,

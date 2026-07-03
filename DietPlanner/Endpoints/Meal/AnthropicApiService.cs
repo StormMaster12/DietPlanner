@@ -23,6 +23,11 @@ public sealed class AnthropicApiService : IAnthropicApiService
     public async Task<string> SendMessageAsync(
         string systemPrompt, string userContent, int maxTokens, string truncatedResponseMessage, CancellationToken cancellationToken)
     {
+        if (!IsConfigured)
+        {
+            throw new HttpRequestException("Anthropic API key is not configured.");
+        }
+
         var requestBody = new AnthropicRequest(_options.Model, maxTokens, systemPrompt, [new AnthropicMessage("user", userContent)]);
 
         using HttpRequestMessage request = new(HttpMethod.Post, _options.BaseUrl);
@@ -39,7 +44,7 @@ public sealed class AnthropicApiService : IAnthropicApiService
         }
 
         AnthropicResponse? anthropicResponse = JsonSerializer.Deserialize<AnthropicResponse>(responseBody);
-        string? text = anthropicResponse?.Content.FirstOrDefault(c => c.Type == "text")?.Text;
+        string? text = anthropicResponse?.Content?.FirstOrDefault(c => c.Type == "text")?.Text;
 
         if (string.IsNullOrWhiteSpace(text))
         {
