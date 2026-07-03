@@ -31,7 +31,8 @@ public sealed class IngredientGroupingServiceTests
     {
         HttpClient httpClient = new(handler);
         IOptions<AnthropicOptions> options = Options.Create(new AnthropicOptions { ApiKey = apiKey, Model = "claude-sonnet-4-6" });
-        return new IngredientGroupingService(httpClient, options, _testDatabase.CreateContext(), NullLogger<IngredientGroupingService>.Instance);
+        AnthropicApiService anthropicApi = new(httpClient, options);
+        return new IngredientGroupingService(anthropicApi, _testDatabase.CreateContext(), NullLogger<IngredientGroupingService>.Instance);
     }
 
     private static string BuildAnthropicResponse(string groupedJsonArray)

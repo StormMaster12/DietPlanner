@@ -52,7 +52,8 @@ public sealed class IngredientNormalizationServiceTests
         StubHttpMessageHandler handler = new(anthropicResponseBody);
         HttpClient httpClient = new(handler);
         IOptions<AnthropicOptions> options = Options.Create(new AnthropicOptions { ApiKey = apiKey, Model = "claude-sonnet-4-6" });
-        return new IngredientNormalizationService(db, httpClient, options, NullLogger<IngredientNormalizationService>.Instance);
+        AnthropicApiService anthropicApi = new(httpClient, options);
+        return new IngredientNormalizationService(db, anthropicApi, NullLogger<IngredientNormalizationService>.Instance);
     }
 
     private static string BuildAnthropicResponse(string normalizedJsonArray)

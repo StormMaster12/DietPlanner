@@ -4,15 +4,12 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using DietPlanner.Endpoints.Slots;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using UglyToad.PdfPig;
 
 namespace DietPlanner.Endpoints.Meal;
 
 public sealed partial class MealPdfImportService : IMealPdfImportService
 {
-    private const string AnthropicVersion = "2023-06-01";
-
     private const string SystemPrompt = """
         You extract structured meal data from free-form text (recipe sheets, meal plans, nutrition
         labels). Read the text and identify every distinct meal/recipe it describes. For each one,
@@ -56,16 +53,13 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private readonly AppDbContext _db;
-    private readonly HttpClient _httpClient;
-    private readonly AnthropicOptions _options;
+    private readonly IAnthropicApiService _anthropicApi;
     private readonly ILogger<MealPdfImportService> _logger;
 
-    public MealPdfImportService(
-        AppDbContext db, HttpClient httpClient, IOptions<AnthropicOptions> options, ILogger<MealPdfImportService> logger)
+    public MealPdfImportService(AppDbContext db, IAnthropicApiService anthropicApi, ILogger<MealPdfImportService> logger)
     {
         _db = db;
-        _httpClient = httpClient;
-        _options = options.Value;
+        _anthropicApi = anthropicApi;
         _logger = logger;
     }
 
@@ -261,7 +255,7 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
     {
         var rowErrors = new List<string>();
 
-        if (string.IsNullOrWhiteSpace(_options.ApiKey))
+        if (!_anthropicApi.IsConfigured)
         {
             rowErrors.Add("PDF import is not configured: missing Anthropic API key.");
             return ([], rowErrors);
@@ -336,76 +330,18 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
 
     private async Task<List<ExtractedMealRow>> CallAnthropicAsync(string extractedText, CancellationToken cancellationToken)
     {
-        var requestBody = new AnthropicRequest(
-            _options.Model,
-            8192,
+        string json = await _anthropicApi.SendMessageAsync(
             SystemPrompt,
-            [new AnthropicMessage("user", extractedText)]);
-
-        using HttpRequestMessage request = new(HttpMethod.Post, _options.BaseUrl);
-        request.Headers.Add("x-api-key", _options.ApiKey);
-        request.Headers.Add("anthropic-version", AnthropicVersion);
-        request.Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
-
-        using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
-        string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new HttpRequestException($"Anthropic API returned {(int)response.StatusCode}: {responseBody}");
-        }
-
-        AnthropicResponse? anthropicResponse = JsonSerializer.Deserialize<AnthropicResponse>(responseBody);
-        string? extractedJson = anthropicResponse?.Content.FirstOrDefault(c => c.Type == "text")?.Text;
-
-        if (string.IsNullOrWhiteSpace(extractedJson))
-        {
-            throw new JsonException("Anthropic API returned no text content.");
-        }
-
-        if (anthropicResponse?.StopReason == "max_tokens")
-        {
-            throw new JsonException(
+            extractedText,
+            maxTokens: 8192,
+            truncatedResponseMessage:
                 "The Anthropic response was truncated because it described too many meals to fit in a " +
                 "single reply, even after splitting the PDF by chapter. Try splitting the source PDF into " +
-                "smaller files and importing them separately.");
-        }
+                "smaller files and importing them separately.",
+            cancellationToken);
 
-        return JsonSerializer.Deserialize<List<ExtractedMealRow>>(StripMarkdownFences(extractedJson)) ?? [];
+        return JsonSerializer.Deserialize<List<ExtractedMealRow>>(json) ?? [];
     }
-
-    private static string StripMarkdownFences(string text)
-    {
-        string trimmed = text.Trim();
-        if (!trimmed.StartsWith("```"))
-        {
-            return trimmed;
-        }
-
-        int firstNewLine = trimmed.IndexOf('\n');
-        int fenceEnd = trimmed.LastIndexOf("```", StringComparison.Ordinal);
-        return firstNewLine < 0 || fenceEnd <= firstNewLine
-            ? trimmed
-            : trimmed[(firstNewLine + 1)..fenceEnd].Trim();
-    }
-
-    private sealed record AnthropicRequest(
-        [property: JsonPropertyName("model")] string Model,
-        [property: JsonPropertyName("max_tokens")] int MaxTokens,
-        [property: JsonPropertyName("system")] string System,
-        [property: JsonPropertyName("messages")] List<AnthropicMessage> Messages);
-
-    private sealed record AnthropicMessage(
-        [property: JsonPropertyName("role")] string Role,
-        [property: JsonPropertyName("content")] string Content);
-
-    private sealed record AnthropicResponse(
-        [property: JsonPropertyName("content")] List<AnthropicContentBlock> Content,
-        [property: JsonPropertyName("stop_reason")] string? StopReason);
-
-    private sealed record AnthropicContentBlock(
-        [property: JsonPropertyName("type")] string Type,
-        [property: JsonPropertyName("text")] string? Text);
 
     private sealed record ExtractedMealRow(
         [property: JsonPropertyName("name")] string Name,

@@ -1,17 +1,13 @@
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DietPlanner.Endpoints.Meal;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace DietPlanner.Endpoints.DayPlan;
 
 public sealed partial class IngredientGroupingService : IIngredientGroupingService
 {
-    private const string AnthropicVersion = "2023-06-01";
-
     /// <summary>Fixed aisle list the model must pick from, so the UI can group/sort consistently.</summary>
     public static readonly IReadOnlyList<string> Categories =
     [
@@ -62,16 +58,13 @@ public sealed partial class IngredientGroupingService : IIngredientGroupingServi
 
     private const int MaxLinesPerChunk = 150;
 
-    private readonly HttpClient _httpClient;
-    private readonly AnthropicOptions _options;
+    private readonly IAnthropicApiService _anthropicApi;
     private readonly AppDbContext _db;
     private readonly ILogger<IngredientGroupingService> _logger;
 
-    public IngredientGroupingService(
-        HttpClient httpClient, IOptions<AnthropicOptions> options, AppDbContext db, ILogger<IngredientGroupingService> logger)
+    public IngredientGroupingService(IAnthropicApiService anthropicApi, AppDbContext db, ILogger<IngredientGroupingService> logger)
     {
-        _httpClient = httpClient;
-        _options = options.Value;
+        _anthropicApi = anthropicApi;
         _db = db;
         _logger = logger;
     }
@@ -99,7 +92,7 @@ public sealed partial class IngredientGroupingService : IIngredientGroupingServi
                 JsonSerializer.Deserialize<List<string>>(cached.ErrorsJson) ?? []);
         }
 
-        if (string.IsNullOrWhiteSpace(_options.ApiKey))
+        if (!_anthropicApi.IsConfigured)
         {
             return new IngredientGroupingResult([], ["Shopping list grouping is not configured: missing Anthropic API key."]);
         }
@@ -181,54 +174,14 @@ public sealed partial class IngredientGroupingService : IIngredientGroupingServi
         var requestLines = chunk.Select(c => new RequestLine(c.Index, c.Ingredient.Name, c.Ingredient.Quantity, c.Ingredient.Unit)).ToList();
         string userContent = JsonSerializer.Serialize(requestLines);
 
-        var requestBody = new AnthropicRequest(
-            _options.Model,
-            8192,
+        string json = await _anthropicApi.SendMessageAsync(
             SystemPrompt,
-            [new AnthropicMessage("user", userContent)]);
+            userContent,
+            maxTokens: 8192,
+            truncatedResponseMessage: "The Anthropic response was truncated because the shopping list was too large to fit in a single reply.",
+            cancellationToken);
 
-        using HttpRequestMessage request = new(HttpMethod.Post, _options.BaseUrl);
-        request.Headers.Add("x-api-key", _options.ApiKey);
-        request.Headers.Add("anthropic-version", AnthropicVersion);
-        request.Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
-
-        using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
-        string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new HttpRequestException($"Anthropic API returned {(int)response.StatusCode}: {responseBody}");
-        }
-
-        AnthropicResponse? anthropicResponse = JsonSerializer.Deserialize<AnthropicResponse>(responseBody);
-        string? resultJson = anthropicResponse?.Content.FirstOrDefault(c => c.Type == "text")?.Text;
-
-        if (string.IsNullOrWhiteSpace(resultJson))
-        {
-            throw new JsonException("Anthropic API returned no text content.");
-        }
-
-        if (anthropicResponse?.StopReason == "max_tokens")
-        {
-            throw new JsonException("The Anthropic response was truncated because the shopping list was too large to fit in a single reply.");
-        }
-
-        return JsonSerializer.Deserialize<List<GroupedLineResult>>(StripMarkdownFences(resultJson)) ?? [];
-    }
-
-    private static string StripMarkdownFences(string text)
-    {
-        string trimmed = text.Trim();
-        if (!trimmed.StartsWith("```"))
-        {
-            return trimmed;
-        }
-
-        int firstNewLine = trimmed.IndexOf('\n');
-        int fenceEnd = trimmed.LastIndexOf("```", StringComparison.Ordinal);
-        return firstNewLine < 0 || fenceEnd <= firstNewLine
-            ? trimmed
-            : trimmed[(firstNewLine + 1)..fenceEnd].Trim();
+        return JsonSerializer.Deserialize<List<GroupedLineResult>>(json) ?? [];
     }
 
     private sealed record RequestLine(
@@ -236,24 +189,6 @@ public sealed partial class IngredientGroupingService : IIngredientGroupingServi
         [property: JsonPropertyName("name")] string Name,
         [property: JsonPropertyName("quantity")] decimal Quantity,
         [property: JsonPropertyName("unit")] string? Unit);
-
-    private sealed record AnthropicRequest(
-        [property: JsonPropertyName("model")] string Model,
-        [property: JsonPropertyName("max_tokens")] int MaxTokens,
-        [property: JsonPropertyName("system")] string System,
-        [property: JsonPropertyName("messages")] List<AnthropicMessage> Messages);
-
-    private sealed record AnthropicMessage(
-        [property: JsonPropertyName("role")] string Role,
-        [property: JsonPropertyName("content")] string Content);
-
-    private sealed record AnthropicResponse(
-        [property: JsonPropertyName("content")] List<AnthropicContentBlock> Content,
-        [property: JsonPropertyName("stop_reason")] string? StopReason);
-
-    private sealed record AnthropicContentBlock(
-        [property: JsonPropertyName("type")] string Type,
-        [property: JsonPropertyName("text")] string? Text);
 
     private sealed record GroupedLineResult(
         [property: JsonPropertyName("index")] int Index,

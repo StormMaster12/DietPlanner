@@ -47,7 +47,8 @@ public sealed class MealPdfImportServiceTests
         StubHttpMessageHandler handler = new(anthropicResponseBody);
         HttpClient httpClient = new(handler);
         IOptions<AnthropicOptions> options = Options.Create(new AnthropicOptions { ApiKey = apiKey, Model = "claude-sonnet-4-6" });
-        return new MealPdfImportService(db, httpClient, options, NullLogger<MealPdfImportService>.Instance);
+        AnthropicApiService anthropicApi = new(httpClient, options);
+        return new MealPdfImportService(db, anthropicApi, NullLogger<MealPdfImportService>.Instance);
     }
 
     private static string BuildAnthropicResponse(string extractedJsonArray)
