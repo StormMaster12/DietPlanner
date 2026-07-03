@@ -52,7 +52,7 @@ else
 
             @if (IsShortOnFibreOrPlants(dayPlan))
             {
-                <button class="btn btn--link" @onclick="@(() => SuggestAllAdditionsAsync(dayPlan))" disabled="@DatesSuggestingAdditions.Contains(dayPlan.Date)">
+                <button class="btn btn--link" @onclick="@(() => SuggestAllAdditionsAsync(dayPlan))" disabled="@(DatesSuggestingAdditions.Count > 0)">
                     @(DatesSuggestingAdditions.Contains(dayPlan.Date) ? "Thinking..." : "Suggest additions for all meals")
                 </button>
             }
@@ -205,7 +205,11 @@ else
     private string? CopyStatusMessage { get; set; }
     private string? GroupingErrorMessage { get; set; }
 
-    /// <summary>The dates currently fetching bulk suggestions, so each day's button can show its own busy state.</summary>
+    /// <summary>
+    /// The dates currently fetching bulk suggestions. All suggestion buttons are disabled while
+    /// this is non-empty - only one day's loop may run at a time, since it shares a scoped
+    /// <see cref="AppDbContext"/> with every other day's loop via <see cref="MealAdditionSuggestionService"/>.
+    /// </summary>
     private HashSet<DateOnly> DatesSuggestingAdditions { get; set; } = new();
 
     /// <summary>The most recent AI-suggested additions per meal, keyed by meal ID.</summary>
