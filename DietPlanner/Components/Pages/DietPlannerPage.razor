@@ -49,6 +49,13 @@ else
         <section class="week-plan__day">
             <h2>@dayPlan.Date.ToString("dddd d MMMM")</h2>
 
+            @if (IsShortOnFibreOrPlants(dayPlan))
+            {
+                <button class="btn btn--link" @onclick="@(() => SuggestAllAdditionsAsync(dayPlan))" disabled="@DatesSuggestingAdditions.Contains(dayPlan.Date)">
+                    @(DatesSuggestingAdditions.Contains(dayPlan.Date) ? "Thinking..." : "Suggest additions for all meals")
+                </button>
+            }
+
             <table class="table">
                 <thead>
                     <tr>
@@ -68,12 +75,6 @@ else
                             <td>@meal.SlotKey</td>
                             <td>
                                 @meal.Name
-                                @if (IsShortOnFibreOrPlants(dayPlan))
-                                {
-                                    <button class="btn btn--link" @onclick="@(() => SuggestAdditionsAsync(dayPlan, meal))" disabled="@IsSuggestingAdditions">
-                                        @(IsSuggestingAdditions && SuggestingForMealId == meal.MealId ? "Thinking..." : "Suggest additions")
-                                    </button>
-                                }
                             </td>
                             <td class="table__value--numeric">@meal.Kcal</td>
                             <td class="table__value--numeric">@meal.ProteinG</td>
@@ -203,8 +204,8 @@ else
     private string? CopyStatusMessage { get; set; }
     private string? GroupingErrorMessage { get; set; }
 
-    private bool IsSuggestingAdditions { get; set; }
-    private Guid? SuggestingForMealId { get; set; }
+    /// <summary>The dates currently fetching bulk suggestions, so each day's button can show its own busy state.</summary>
+    private HashSet<DateOnly> DatesSuggestingAdditions { get; set; } = new();
 
     /// <summary>The most recent AI-suggested additions per meal, keyed by meal ID.</summary>
     private Dictionary<Guid, MealAdditionSuggestionResult> SuggestionsByMealId { get; set; } = new();
@@ -257,33 +258,34 @@ else
     }
 
     /// <summary>
-    /// Sends this meal's name, notes and ingredients to the AI suggestion service, along with how
-    /// far the day is below its fibre/plant targets, and stores the result for display under the
-    /// meal's row.
+    /// Sends every meal in this day to the AI suggestion service, one at a time (the service shares
+    /// a scoped <c>AppDbContext</c>, so calls can't run concurrently), along with how far the day is
+    /// below its fibre/plant targets, and stores each result for display under its meal's row.
     /// </summary>
-    private async Task SuggestAdditionsAsync(DayPlanResponseDto dayPlan, DayPlanMealDto meal)
+    private async Task SuggestAllAdditionsAsync(DayPlanResponseDto dayPlan)
     {
-        IsSuggestingAdditions = true;
-        SuggestingForMealId = meal.MealId;
+        DatesSuggestingAdditions.Add(dayPlan.Date);
 
         try
         {
-            MealAdditionSuggestionRequest request = new(
-                meal.MealId,
-                meal.Name,
-                meal.ZoeNotes,
-                meal.Notes,
-                meal.Ingredients,
-                Math.Max(0, dayPlan.Remaining.FibreG),
-                Math.Max(0, dayPlan.Remaining.Plants));
+            foreach (DayPlanMealDto meal in dayPlan.Meals)
+            {
+                MealAdditionSuggestionRequest request = new(
+                    meal.MealId,
+                    meal.Name,
+                    meal.ZoeNotes,
+                    meal.Notes,
+                    meal.Ingredients,
+                    Math.Max(0, dayPlan.Remaining.FibreG),
+                    Math.Max(0, dayPlan.Remaining.Plants));
 
-            MealAdditionSuggestionResult result = await MealAdditionSuggestionService.SuggestAdditionsAsync(request, CancellationToken.None);
-            SuggestionsByMealId[meal.MealId] = result;
+                MealAdditionSuggestionResult result = await MealAdditionSuggestionService.SuggestAdditionsAsync(request, CancellationToken.None);
+                SuggestionsByMealId[meal.MealId] = result;
+            }
         }
         finally
         {
-            IsSuggestingAdditions = false;
-            SuggestingForMealId = null;
+            DatesSuggestingAdditions.Remove(dayPlan.Date);
         }
     }
 
