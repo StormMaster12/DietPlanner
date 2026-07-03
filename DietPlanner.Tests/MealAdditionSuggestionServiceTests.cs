@@ -29,7 +29,8 @@ public sealed class MealAdditionSuggestionServiceTests
     {
         HttpClient httpClient = new(handler);
         IOptions<AnthropicOptions> options = Options.Create(new AnthropicOptions { ApiKey = apiKey, Model = "claude-sonnet-4-6" });
-        return new MealAdditionSuggestionService(httpClient, options, _testDatabase.CreateContext(), NullLogger<MealAdditionSuggestionService>.Instance);
+        AnthropicApiService anthropicApi = new(httpClient, options);
+        return new MealAdditionSuggestionService(anthropicApi, _testDatabase.CreateContext(), NullLogger<MealAdditionSuggestionService>.Instance);
     }
 
     private static string BuildAnthropicResponse(string suggestionsJsonArray)

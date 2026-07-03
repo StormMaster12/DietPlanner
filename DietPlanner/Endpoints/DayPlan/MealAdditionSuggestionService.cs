@@ -1,17 +1,13 @@
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DietPlanner.Endpoints.Meal;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace DietPlanner.Endpoints.DayPlan;
 
 public sealed partial class MealAdditionSuggestionService : IMealAdditionSuggestionService
 {
-    private const string AnthropicVersion = "2023-06-01";
-
     private const string SystemPrompt =
         """
         You help someone close a gap in their daily fibre and/or plant-diversity targets by
@@ -29,16 +25,13 @@ public sealed partial class MealAdditionSuggestionService : IMealAdditionSuggest
         If you cannot think of any reasonable addition, return an empty array.
         """;
 
-    private readonly HttpClient _httpClient;
-    private readonly AnthropicOptions _options;
+    private readonly IAnthropicApiService _anthropicApi;
     private readonly AppDbContext _db;
     private readonly ILogger<MealAdditionSuggestionService> _logger;
 
-    public MealAdditionSuggestionService(
-        HttpClient httpClient, IOptions<AnthropicOptions> options, AppDbContext db, ILogger<MealAdditionSuggestionService> logger)
+    public MealAdditionSuggestionService(IAnthropicApiService anthropicApi, AppDbContext db, ILogger<MealAdditionSuggestionService> logger)
     {
-        _httpClient = httpClient;
-        _options = options.Value;
+        _anthropicApi = anthropicApi;
         _db = db;
         _logger = logger;
     }
@@ -61,7 +54,7 @@ public sealed partial class MealAdditionSuggestionService : IMealAdditionSuggest
                 JsonSerializer.Deserialize<List<string>>(cached.ErrorsJson) ?? []);
         }
 
-        if (string.IsNullOrWhiteSpace(_options.ApiKey))
+        if (!_anthropicApi.IsConfigured)
         {
             return new MealAdditionSuggestionResult([], ["Meal addition suggestions are not configured: missing Anthropic API key."]);
         }
@@ -132,54 +125,14 @@ public sealed partial class MealAdditionSuggestionService : IMealAdditionSuggest
 
     private async Task<List<SuggestedAdditionResult>> CallAnthropicAsync(string userContent, CancellationToken cancellationToken)
     {
-        var requestBody = new AnthropicRequest(
-            _options.Model,
-            2048,
+        string json = await _anthropicApi.SendMessageAsync(
             SystemPrompt,
-            [new AnthropicMessage("user", userContent)]);
+            userContent,
+            maxTokens: 2048,
+            truncatedResponseMessage: "The Anthropic response was truncated.",
+            cancellationToken);
 
-        using HttpRequestMessage httpRequest = new(HttpMethod.Post, _options.BaseUrl);
-        httpRequest.Headers.Add("x-api-key", _options.ApiKey);
-        httpRequest.Headers.Add("anthropic-version", AnthropicVersion);
-        httpRequest.Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
-
-        using HttpResponseMessage response = await _httpClient.SendAsync(httpRequest, cancellationToken);
-        string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new HttpRequestException($"Anthropic API returned {(int)response.StatusCode}: {responseBody}");
-        }
-
-        AnthropicResponse? anthropicResponse = JsonSerializer.Deserialize<AnthropicResponse>(responseBody);
-        string? resultJson = anthropicResponse?.Content.FirstOrDefault(c => c.Type == "text")?.Text;
-
-        if (string.IsNullOrWhiteSpace(resultJson))
-        {
-            throw new JsonException("Anthropic API returned no text content.");
-        }
-
-        if (anthropicResponse?.StopReason == "max_tokens")
-        {
-            throw new JsonException("The Anthropic response was truncated.");
-        }
-
-        return JsonSerializer.Deserialize<List<SuggestedAdditionResult>>(StripMarkdownFences(resultJson)) ?? [];
-    }
-
-    private static string StripMarkdownFences(string text)
-    {
-        string trimmed = text.Trim();
-        if (!trimmed.StartsWith("```"))
-        {
-            return trimmed;
-        }
-
-        int firstNewLine = trimmed.IndexOf('\n');
-        int fenceEnd = trimmed.LastIndexOf("```", StringComparison.Ordinal);
-        return firstNewLine < 0 || fenceEnd <= firstNewLine
-            ? trimmed
-            : trimmed[(firstNewLine + 1)..fenceEnd].Trim();
+        return JsonSerializer.Deserialize<List<SuggestedAdditionResult>>(json) ?? [];
     }
 
     private sealed record RequestIngredient(
@@ -194,24 +147,6 @@ public sealed partial class MealAdditionSuggestionService : IMealAdditionSuggest
         [property: JsonPropertyName("ingredients")] List<RequestIngredient> Ingredients,
         [property: JsonPropertyName("fibreShortfallG")] int FibreShortfallG,
         [property: JsonPropertyName("plantsShortfall")] int PlantsShortfall);
-
-    private sealed record AnthropicRequest(
-        [property: JsonPropertyName("model")] string Model,
-        [property: JsonPropertyName("max_tokens")] int MaxTokens,
-        [property: JsonPropertyName("system")] string System,
-        [property: JsonPropertyName("messages")] List<AnthropicMessage> Messages);
-
-    private sealed record AnthropicMessage(
-        [property: JsonPropertyName("role")] string Role,
-        [property: JsonPropertyName("content")] string Content);
-
-    private sealed record AnthropicResponse(
-        [property: JsonPropertyName("content")] List<AnthropicContentBlock> Content,
-        [property: JsonPropertyName("stop_reason")] string? StopReason);
-
-    private sealed record AnthropicContentBlock(
-        [property: JsonPropertyName("type")] string Type,
-        [property: JsonPropertyName("text")] string? Text);
 
     private sealed record SuggestedAdditionResult(
         [property: JsonPropertyName("ingredient")] string Ingredient,
