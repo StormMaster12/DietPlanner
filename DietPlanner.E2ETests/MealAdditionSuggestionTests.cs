@@ -40,10 +40,15 @@ public sealed class MealAdditionSuggestionTests : PageTestBase
         return mealId;
     }
 
+    /// <summary>Clicks the first day's suggest button and waits until the page reports that run has finished.</summary>
     private async Task SuggestAdditionsForFirstDayAsync()
     {
+        ILocator toolbar = Page.Locator(".week-plan__toolbar");
+        int completedRuns = int.Parse(await toolbar.GetAttributeAsync("data-completed-suggestion-runs") ?? "0");
+
         await Page.GetByRole(AriaRole.Button, new() { Name = "Suggest additions for all meals" }).First.ClickAsync();
-        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Thinking..." })).ToHaveCountAsync(0);
+
+        await Expect(toolbar).ToHaveAttributeAsync("data-completed-suggestion-runs", (completedRuns + 1).ToString());
     }
 
     [Test]
@@ -149,6 +154,7 @@ public sealed class MealAdditionSuggestionTests : PageTestBase
         await Expect(Page.Locator(".shopping-list__item")).ToHaveTextAsync(["12 g Chia seeds", "50 g Oats"]);
         IReadOnlyList<string> requests = await GetAnthropicRequestBodiesAsync();
         Assert.That(requests, Has.Count.EqualTo(2));
-        Assert.That(requests[1], Does.Contain("Chia seeds"));
+        string groupingRequest = requests.Single(r => r.Contains("supermarket aisle"));
+        Assert.That(groupingRequest, Does.Contain("Chia seeds"));
     }
 }

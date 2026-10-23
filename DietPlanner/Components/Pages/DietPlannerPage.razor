@@ -8,7 +8,7 @@
     <strong>@WeekStartDate.AddDays(6).ToString("dddd d MMMM yyyy")</strong>.
 </p>
 
-<div class="week-plan__toolbar">
+<div class="week-plan__toolbar" data-completed-suggestion-runs="@CompletedSuggestionRuns">
     <button class="btn btn--secondary" @onclick="GoToPreviousWeekAsync" disabled="@IsDbBusy">&laquo; Previous week</button>
     <button class="btn btn--secondary" @onclick="GoToNextWeekAsync" disabled="@IsDbBusy">Next week &raquo;</button>
     <button class="btn btn--primary" @onclick="GenerateWeekAsync" disabled="@IsDbBusy">
@@ -218,6 +218,13 @@ else
     private HashSet<DateOnly> DatesSuggestingAdditions { get; set; } = new();
 
     /// <summary>
+    /// Bumped each time a bulk suggestion run finishes and rendered as a data attribute, giving
+    /// e2e tests a deterministic completion signal - a run that reuses saved suggestions can finish
+    /// without ever rendering its "Thinking..." state.
+    /// </summary>
+    private int CompletedSuggestionRuns { get; set; }
+
+    /// <summary>
     /// True while week generation, shopping-list grouping, or bulk suggestions is in flight, so
     /// every button backed by the page's scoped <see cref="AppDbContext"/> can be disabled and
     /// none of those operations overlap on the same context.
@@ -326,6 +333,7 @@ else
         finally
         {
             DatesSuggestingAdditions.Remove(dayPlan.Date);
+            CompletedSuggestionRuns++;
         }
     }
 
