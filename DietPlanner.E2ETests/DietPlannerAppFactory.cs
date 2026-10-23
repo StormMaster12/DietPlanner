@@ -103,23 +103,56 @@ public sealed class DietPlannerAppFactory : IAsyncDisposable
         response.EnsureSuccessStatusCode();
     }
 
-    /// <summary>
-    /// Wipes per-test app data and any WireMock stub registered via
-    /// <see cref="StubAnthropicResponseAsync"/>, so the shared container starts each test from a
-    /// clean slate without needing to be recreated.
-    /// </summary>
-    public async Task ResetStateAsync()
+    /// <summary>Removes every stub registered via <see cref="StubAnthropicResponseAsync"/>, so a test can swap in a different response mid-test.</summary>
+    public async Task ClearAnthropicStubsAsync()
     {
         using HttpClient wireMockAdminClient = _wireMockContainer.CreateClient();
-        using HttpResponseMessage clearMappingsResponse =
-            await wireMockAdminClient.DeleteAsync("__admin/mappings");
-        clearMappingsResponse.EnsureSuccessStatusCode();
+        using HttpResponseMessage response = await wireMockAdminClient.DeleteAsync("__admin/mappings");
+        response.EnsureSuccessStatusCode();
+    }
 
-        using HttpClient appClient = new() { BaseAddress = new Uri($"{ServerAddress}/") };
+    /// <summary>
+    /// The bodies of every request the app has sent to the stubbed Anthropic Messages API since the
+    /// last reset, so tests can assert on how many LLM calls were made and what was sent.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetAnthropicRequestBodiesAsync()
+    {
+        using HttpClient wireMockAdminClient = _wireMockContainer.CreateClient();
+        string json = await wireMockAdminClient.GetStringAsync("__admin/requests");
+
+        using System.Text.Json.JsonDocument document = System.Text.Json.JsonDocument.Parse(json);
+        return document.RootElement.EnumerateArray()
+            .Select(entry => entry.GetProperty("Request"))
+            .Where(request => request.GetProperty("Path").GetString() == "/v1/messages")
+            .Select(request => request.TryGetProperty("Body", out System.Text.Json.JsonElement body) ? body.GetString() ?? string.Empty : string.Empty)
+            .ToList();
+    }
+
+    /// <summary>An <see cref="HttpClient"/> for the app's own API, already carrying the test Basic Auth credentials.</summary>
+    public HttpClient CreateAppClient()
+    {
+        HttpClient appClient = new() { BaseAddress = new Uri($"{ServerAddress}/") };
         appClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
             "Basic",
             Convert.ToBase64String(Encoding.UTF8.GetBytes($"{TestUsername}:{TestPassword}")));
+        return appClient;
+    }
 
+    /// <summary>
+    /// Wipes per-test app data, any WireMock stub registered via
+    /// <see cref="StubAnthropicResponseAsync"/> and WireMock's request log, so the shared container
+    /// starts each test from a clean slate without needing to be recreated.
+    /// </summary>
+    public async Task ResetStateAsync()
+    {
+        await ClearAnthropicStubsAsync();
+
+        using HttpClient wireMockAdminClient = _wireMockContainer.CreateClient();
+        using HttpResponseMessage clearRequestsResponse =
+            await wireMockAdminClient.DeleteAsync("__admin/requests");
+        clearRequestsResponse.EnsureSuccessStatusCode();
+
+        using HttpClient appClient = CreateAppClient();
         using HttpResponseMessage resetResponse = await appClient.PostAsync("__test__/reset", content: null);
         resetResponse.EnsureSuccessStatusCode();
     }

@@ -3,6 +3,7 @@ using DietPlanner.Endpoints.Meal;
 using DietPlanner.Endpoints.Settings;
 using DietPlanner.Endpoints.Slots;
 using DietPlanner.Endpoints.WeekPlan;
+using Microsoft.EntityFrameworkCore;
 
 namespace DietPlanner.Tests;
 
@@ -103,4 +104,142 @@ public sealed class DayPlanServiceTests
         Assert.That(result.Meals.Select(m => m.SlotKey), Is.EqualTo(new[] { SlotKey.Breakfast, SlotKey.Dinner }));
     }
 
+
+    private async Task<Guid> SeedPlannedMealAsync(params (DateOnly Date, decimal PortionMultiplier)[] plannedOn)
+    {
+        Guid mealId = Guid.NewGuid();
+        using AppDbContext db = _database.CreateContext();
+        db.Slots.Add(new Slot(SlotKey.Breakfast, "Breakfast", 1));
+        db.Meals.Add(new MealEntry
+        {
+            Id = mealId,
+            Name = "Porridge",
+            SlotKey = SlotKey.Breakfast,
+            Kcal = 300,
+            MfName = "Porridge MFP",
+            Ingredients = new List<MealIngredient>
+            {
+                new() { Id = Guid.NewGuid(), MealId = mealId, Name = "Oats", Quantity = 50, Unit = "g" }
+            }
+        });
+        foreach ((DateOnly date, decimal portionMultiplier) in plannedOn)
+        {
+            db.WeekPlanEntries.Add(new WeekPlanEntry(Guid.NewGuid(), date, SlotKey.Breakfast, mealId, portionMultiplier, null));
+        }
+
+        await db.SaveChangesAsync();
+        return mealId;
+    }
+
+    /// <summary>Saves suggestions for the meal as it currently stands, as the suggestion service would after an AI call.</summary>
+    private async Task SaveSuggestionsAsync(Guid mealId, params MealSuggestedAddition[] additions)
+    {
+        using AppDbContext db = _database.CreateContext();
+        MealEntry meal = db.Meals.Include(m => m.Ingredients).Single(m => m.Id == mealId);
+        db.MealAdditionSuggestionSets.Add(new MealAdditionSuggestionSet
+        {
+            MealId = mealId,
+            MealFingerprint = MealAdditionFingerprint.Compute(meal),
+            CreatedAtUtc = DateTime.UtcNow,
+            Additions = additions.ToList(),
+        });
+        await db.SaveChangesAsync();
+    }
+
+    private static MealSuggestedAddition Addition(Guid mealId, int sortOrder, string name, decimal quantity, string? unit)
+        => new() { Id = Guid.NewGuid(), MealId = mealId, SortOrder = sortOrder, Name = name, Quantity = quantity, Unit = unit, Reason = $"{name} adds fibre." };
+
+    [Test]
+    public async Task GetDayPlanAsync_WithNoSavedSuggestions_ReturnsNullSuggestedAdditions()
+    {
+        DateOnly date = new(2026, 1, 5);
+        await SeedPlannedMealAsync((date, 1m));
+
+        using AppDbContext db = _database.CreateContext();
+        DayPlanResponseDto result = await new DayPlanService(db, new SettingsService(db)).GetDayPlanAsync(date, CancellationToken.None);
+
+        Assert.That(result.Meals.Single().SuggestedAdditions, Is.Null);
+    }
+
+    [Test]
+    public async Task GetDayPlanAsync_WithSavedSuggestions_ReturnsThemInSuggestedOrder()
+    {
+        DateOnly date = new(2026, 1, 5);
+        Guid mealId = await SeedPlannedMealAsync((date, 1m));
+        await SaveSuggestionsAsync(mealId,
+            Addition(mealId, 1, "Apple", 1m, null),
+            Addition(mealId, 0, "Chia seeds", 1m, "tbsp"));
+
+        using AppDbContext db = _database.CreateContext();
+        DayPlanResponseDto result = await new DayPlanService(db, new SettingsService(db)).GetDayPlanAsync(date, CancellationToken.None);
+
+        Assert.That(result.Meals.Single().SuggestedAdditions, Is.EqualTo(new[]
+        {
+            new SuggestedMealAddition("Chia seeds", 1m, "tbsp", "Chia seeds adds fibre."),
+            new SuggestedMealAddition("Apple", 1m, null, "Apple adds fibre."),
+        }));
+    }
+
+    [Test]
+    public async Task GetDayPlanAsync_WithSavedEmptySuggestions_ReturnsEmptyListRatherThanNull()
+    {
+        DateOnly date = new(2026, 1, 5);
+        Guid mealId = await SeedPlannedMealAsync((date, 1m));
+        await SaveSuggestionsAsync(mealId);
+
+        using AppDbContext db = _database.CreateContext();
+        DayPlanResponseDto result = await new DayPlanService(db, new SettingsService(db)).GetDayPlanAsync(date, CancellationToken.None);
+
+        Assert.That(result.Meals.Single().SuggestedAdditions, Is.Not.Null.And.Empty);
+    }
+
+    [Test]
+    public async Task GetDayPlanAsync_SameMealOnDifferentDays_ShowsSameSuggestionsScaledToEachPortion()
+    {
+        DateOnly monday = new(2026, 1, 5);
+        DateOnly tuesday = monday.AddDays(1);
+        Guid mealId = await SeedPlannedMealAsync((monday, 1m), (tuesday, 2m));
+        await SaveSuggestionsAsync(mealId, Addition(mealId, 0, "Chia seeds", 1.5m, "tbsp"));
+
+        using AppDbContext db = _database.CreateContext();
+        DayPlanService service = new(db, new SettingsService(db));
+        DayPlanResponseDto mondayPlan = await service.GetDayPlanAsync(monday, CancellationToken.None);
+        DayPlanResponseDto tuesdayPlan = await service.GetDayPlanAsync(tuesday, CancellationToken.None);
+
+        Assert.That(mondayPlan.Meals.Single().SuggestedAdditions!.Single().Quantity, Is.EqualTo(1.5m));
+        Assert.That(tuesdayPlan.Meals.Single().SuggestedAdditions!.Single().Quantity, Is.EqualTo(3m));
+    }
+
+    [Test]
+    public async Task GetDayPlanAsync_WhenMealEditedSinceSuggestionsWereSaved_HidesThem()
+    {
+        DateOnly date = new(2026, 1, 5);
+        Guid mealId = await SeedPlannedMealAsync((date, 1m));
+        await SaveSuggestionsAsync(mealId, Addition(mealId, 0, "Chia seeds", 1m, "tbsp"));
+
+        using (AppDbContext editDb = _database.CreateContext())
+        {
+            editDb.MealIngredients.Add(new MealIngredient { Id = Guid.NewGuid(), MealId = mealId, Name = "Banana", Quantity = 1m });
+            await editDb.SaveChangesAsync();
+        }
+
+        using AppDbContext db = _database.CreateContext();
+        DayPlanResponseDto result = await new DayPlanService(db, new SettingsService(db)).GetDayPlanAsync(date, CancellationToken.None);
+
+        Assert.That(result.Meals.Single().SuggestedAdditions, Is.Null);
+    }
+
+    [Test]
+    public async Task GetDayPlanAsync_SuggestedAdditions_DoNotChangeMealIngredientsOrTotals()
+    {
+        DateOnly date = new(2026, 1, 5);
+        Guid mealId = await SeedPlannedMealAsync((date, 1m));
+        await SaveSuggestionsAsync(mealId, Addition(mealId, 0, "Chia seeds", 1m, "tbsp"));
+
+        using AppDbContext db = _database.CreateContext();
+        DayPlanResponseDto result = await new DayPlanService(db, new SettingsService(db)).GetDayPlanAsync(date, CancellationToken.None);
+
+        Assert.That(result.Meals.Single().Ingredients.Select(i => i.Name), Is.EqualTo(new[] { "Oats" }));
+        Assert.That(result.Totals.Kcal, Is.EqualTo(300));
+    }
 }

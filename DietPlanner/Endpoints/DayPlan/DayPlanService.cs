@@ -27,6 +27,13 @@ public sealed class DayPlanService : IDayPlanService
             .Include(x => x.Slot)
             .ToListAsync(cancellationToken);
 
+        List<Guid> mealIds = planned.Select(p => p.MealId).Distinct().ToList();
+        Dictionary<Guid, MealAdditionSuggestionSet> suggestionSets = await _db.MealAdditionSuggestionSets
+            .AsNoTracking()
+            .Where(s => mealIds.Contains(s.MealId))
+            .Include(s => s.Additions)
+            .ToDictionaryAsync(s => s.MealId, cancellationToken);
+
         static int Scale(int v, decimal mult)
         {
             return (int)Math.Round(v * (double)mult);
@@ -41,6 +48,13 @@ public sealed class DayPlanService : IDayPlanService
                 List<DayPlanIngredientDto> ingredients = m.Ingredients
                     .Select(i => new DayPlanIngredientDto(i.Name, Math.Round(i.Quantity * mult, 2), i.Unit))
                     .ToList();
+
+                // Suggestions generated before the meal was last edited no longer describe it, so
+                // they're hidden (and left out of the shopping list) until regenerated.
+                List<SuggestedMealAddition>? additions =
+                    suggestionSets.TryGetValue(m.Id, out MealAdditionSuggestionSet? set) && set.MealFingerprint == MealAdditionFingerprint.Compute(m)
+                        ? MealAdditionSuggestionService.ToSuggestions(set).Select(a => a.ScaledBy(mult)).ToList()
+                        : null;
 
                 return new DayPlanMealDto(
                     date,
@@ -57,7 +71,8 @@ public sealed class DayPlanService : IDayPlanService
                     Scale(m.Plants, mult),
                     m.ZoeNotes,
                     p.Notes,
-                    ingredients
+                    ingredients,
+                    additions
                 );
             })
             .OrderBy(x => x.SlotOrder)

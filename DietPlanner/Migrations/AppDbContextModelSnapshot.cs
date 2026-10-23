@@ -17,7 +17,7 @@ namespace DietPlanner.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.23");
 
-            modelBuilder.Entity("DietPlanner.Endpoints.DayPlan.MealAdditionSuggestionCacheEntry", b =>
+            modelBuilder.Entity("DietPlanner.Endpoints.DayPlan.MealAdditionSuggestionSet", b =>
                 {
                     b.Property<Guid>("MealId")
                         .HasColumnType("TEXT");
@@ -25,21 +25,46 @@ namespace DietPlanner.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ErrorsJson")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("RequestFingerprint")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("SuggestionsJson")
+                    b.Property<string>("MealFingerprint")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.HasKey("MealId");
 
-                    b.ToTable("MealAdditionSuggestionCache");
+                    b.ToTable("MealAdditionSuggestionSets");
+                });
+
+            modelBuilder.Entity("DietPlanner.Endpoints.DayPlan.MealSuggestedAddition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("MealId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Unit")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MealId");
+
+                    b.ToTable("MealSuggestedAdditions");
                 });
 
             modelBuilder.Entity("DietPlanner.Endpoints.DayPlan.ShoppingListGroupingCacheEntry", b =>
@@ -203,6 +228,28 @@ namespace DietPlanner.Migrations
                     b.ToTable("WeekPlanEntries");
                 });
 
+            modelBuilder.Entity("DietPlanner.Endpoints.DayPlan.MealAdditionSuggestionSet", b =>
+                {
+                    b.HasOne("DietPlanner.Endpoints.Meal.MealEntry", "Meal")
+                        .WithOne()
+                        .HasForeignKey("DietPlanner.Endpoints.DayPlan.MealAdditionSuggestionSet", "MealId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Meal");
+                });
+
+            modelBuilder.Entity("DietPlanner.Endpoints.DayPlan.MealSuggestedAddition", b =>
+                {
+                    b.HasOne("DietPlanner.Endpoints.DayPlan.MealAdditionSuggestionSet", "SuggestionSet")
+                        .WithMany("Additions")
+                        .HasForeignKey("MealId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SuggestionSet");
+                });
+
             modelBuilder.Entity("DietPlanner.Endpoints.Meal.MealEntry", b =>
                 {
                     b.HasOne("DietPlanner.Endpoints.Slots.Slot", "Slot")
@@ -242,6 +289,11 @@ namespace DietPlanner.Migrations
                     b.Navigation("Meal");
 
                     b.Navigation("Slot");
+                });
+
+            modelBuilder.Entity("DietPlanner.Endpoints.DayPlan.MealAdditionSuggestionSet", b =>
+                {
+                    b.Navigation("Additions");
                 });
 
             modelBuilder.Entity("DietPlanner.Endpoints.Meal.MealEntry", b =>

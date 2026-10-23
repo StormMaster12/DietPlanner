@@ -16,6 +16,9 @@ public static class TestResetEndpoints
             // everything else is per-test state the e2e suite needs wiped between tests. Deleted
             // in FK dependency order since Restrict prevents the DB from cascading for us.
             await db.WeekPlanEntries.ExecuteDeleteAsync();
+            await db.MealSuggestedAdditions.ExecuteDeleteAsync();
+            await db.MealAdditionSuggestionSets.ExecuteDeleteAsync();
+            await db.ShoppingListGroupingCache.ExecuteDeleteAsync();
             await db.MealIngredients.ExecuteDeleteAsync();
             await db.Meals.ExecuteDeleteAsync();
             await db.Settings.ExecuteDeleteAsync();

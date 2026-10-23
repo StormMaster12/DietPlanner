@@ -83,25 +83,30 @@ else
                             <td class="table__value--numeric">@meal.FibreG</td>
                             <td class="table__value--numeric">@meal.Plants</td>
                         </tr>
-                        @if (SuggestionsByMealId.TryGetValue(meal.MealId, out MealAdditionSuggestionResult? suggestionResult))
+                        @if (SuggestionErrorsByMealId.TryGetValue(meal.MealId, out string? suggestionError))
                         {
                             <tr>
                                 <td></td>
                                 <td colspan="6" class="meal-suggestions">
-                                    @if (suggestionResult.Errors.Count > 0)
-                                    {
-                                        <div class="alert alert--error">@string.Join(" ", suggestionResult.Errors)</div>
-                                    }
-                                    else if (suggestionResult.Suggestions.Count == 0)
+                                    <div class="alert alert--error">@suggestionError</div>
+                                </td>
+                            </tr>
+                        }
+                        else if (meal.SuggestedAdditions is not null)
+                        {
+                            <tr>
+                                <td></td>
+                                <td colspan="6" class="meal-suggestions">
+                                    @if (meal.SuggestedAdditions.Count == 0)
                                     {
                                         <p>No additions suggested.</p>
                                     }
                                     else
                                     {
                                         <ul class="meal-suggestions__list">
-                                            @foreach (SuggestedMealAddition suggestion in suggestionResult.Suggestions)
+                                            @foreach (SuggestedMealAddition suggestion in meal.SuggestedAdditions)
                                             {
-                                                <li><strong>@suggestion.Amount @suggestion.Ingredient</strong> - @suggestion.Reason</li>
+                                                <li><strong>@FormatQuantity(suggestion.Quantity, suggestion.Unit) @suggestion.Ingredient</strong> - @suggestion.Reason</li>
                                             }
                                         </ul>
                                     }
@@ -219,8 +224,11 @@ else
     /// </summary>
     private bool IsDbBusy => IsBusy || IsGroupingShoppingList || DatesSuggestingAdditions.Count > 0;
 
-    /// <summary>The most recent AI-suggested additions per meal, keyed by meal ID.</summary>
-    private Dictionary<Guid, MealAdditionSuggestionResult> SuggestionsByMealId { get; set; } = new();
+    /// <summary>
+    /// Suggestion failures from the most recent run, keyed by meal ID. Only kept for as long as the
+    /// week is on screen - failures are logged, not saved, so a later run simply retries.
+    /// </summary>
+    private Dictionary<Guid, string> SuggestionErrorsByMealId { get; set; } = new();
 
     private const int DaysInWeek = 7;
 
@@ -259,11 +267,11 @@ else
         }
 
         DayPlans = loadedDayPlans;
-        WeeklyShoppingList = BuildWeeklyShoppingList(loadedDayPlans);
+        WeeklyShoppingList = WeeklyShoppingListBuilder.Build(loadedDayPlans);
         GroupedShoppingList = null;
         GroupingErrorMessage = null;
         CopyStatusMessage = null;
-        SuggestionsByMealId = new();
+        SuggestionErrorsByMealId = new();
     }
 
     /// <summary>True once the day's running totals have fallen below either its fibre or plants target.</summary>
@@ -275,7 +283,8 @@ else
     /// <summary>
     /// Sends every meal in this day to the AI suggestion service, one at a time (the service shares
     /// a scoped <c>AppDbContext</c>, so calls can't run concurrently), along with how far the day is
-    /// below its fibre/plant targets, and stores each result for display under its meal's row.
+    /// below its fibre/plant targets. The service saves each meal's additions, so they're shown under
+    /// every occurrence of that meal this week and added to the shopping list.
     /// </summary>
     private async Task SuggestAllAdditionsAsync(DayPlanResponseDto dayPlan)
     {
@@ -283,25 +292,32 @@ else
 
         try
         {
-            foreach (DayPlanMealDto meal in dayPlan.Meals)
+            foreach (DayPlanMealDto meal in dayPlan.Meals.DistinctBy(m => m.MealId))
             {
                 MealAdditionSuggestionRequest request = new(
                     meal.MealId,
-                    meal.Name,
-                    meal.ZoeNotes,
-                    meal.Notes,
-                    meal.Ingredients,
                     Math.Max(0, dayPlan.Remaining.FibreG),
                     Math.Max(0, dayPlan.Remaining.Plants));
 
+                SuggestionErrorsByMealId.Remove(meal.MealId);
+
                 try
                 {
-                    SuggestionsByMealId[meal.MealId] = await MealAdditionSuggestionService.SuggestAdditionsAsync(request, CancellationToken.None);
+                    MealAdditionSuggestionResult result = await MealAdditionSuggestionService.SuggestAdditionsAsync(request, CancellationToken.None);
+
+                    if (result.Errors.Count > 0)
+                    {
+                        SuggestionErrorsByMealId[meal.MealId] = string.Join(" ", result.Errors);
+                    }
+                    else
+                    {
+                        ApplySuggestedAdditions(meal.MealId, result.Suggestions);
+                    }
                 }
                 catch (Exception ex)
                 {
                     Logger.LogError(ex, "Meal addition suggestion failed for meal '{MealName}'", meal.Name);
-                    SuggestionsByMealId[meal.MealId] = new MealAdditionSuggestionResult([], [$"Could not get suggestions for '{meal.Name}'."]);
+                    SuggestionErrorsByMealId[meal.MealId] = $"Could not get suggestions for '{meal.Name}'.";
                 }
 
                 StateHasChanged();
@@ -311,6 +327,41 @@ else
         {
             DatesSuggestingAdditions.Remove(dayPlan.Date);
         }
+    }
+
+    /// <summary>
+    /// Shows a meal's freshly saved additions under every day it's planned on this week, scaled to
+    /// each entry's portion, and folds them into the shopping list - matching what reloading the
+    /// week from the database would show, without re-querying every day.
+    /// </summary>
+    private void ApplySuggestedAdditions(Guid mealId, IReadOnlyList<SuggestedMealAddition> suggestions)
+    {
+        if (DayPlans is null)
+        {
+            return;
+        }
+
+        DayPlans = DayPlans
+            .Select(d => d with
+            {
+                Meals = d.Meals
+                    .Select(m => m.MealId == mealId
+                        ? m with { SuggestedAdditions = suggestions.Select(s => s.ScaledBy(m.PortionMultiplier)).ToList() }
+                        : m)
+                    .ToList()
+            })
+            .ToList();
+
+        WeeklyShoppingList = WeeklyShoppingListBuilder.Build(DayPlans);
+        GroupedShoppingList = null;
+        CopyStatusMessage = null;
+    }
+
+    /// <summary>Formats a quantity the way ingredients are written, e.g. "1.5 tbsp" or "2" for a countable item.</summary>
+    private static string FormatQuantity(decimal quantity, string? unit)
+    {
+        string amount = quantity.ToString("0.##");
+        return string.IsNullOrWhiteSpace(unit) ? amount : $"{amount} {unit}";
     }
 
     /// <summary>
@@ -339,22 +390,6 @@ else
         {
             IsGroupingShoppingList = false;
         }
-    }
-
-    /// <summary>
-    /// Combines every ingredient across every meal in the week, summing the quantities of any
-    /// ingredients that share the same name and unit (e.g. two different meals both calling for
-    /// "g" of "Chicken breast" become a single combined shopping-list line).
-    /// </summary>
-    private static List<DayPlanIngredientDto> BuildWeeklyShoppingList(List<DayPlanResponseDto> dayPlans)
-    {
-        return dayPlans
-            .SelectMany(d => d.Meals)
-            .SelectMany(m => m.Ingredients)
-            .GroupBy(i => (i.Name, i.Unit))
-            .Select(g => new DayPlanIngredientDto(g.Key.Name, g.Sum(i => i.Quantity), g.Key.Unit))
-            .OrderBy(i => i.Name)
-            .ToList();
     }
 
     /// <summary>Copies the grouped shopping list as plain text, with an aisle heading per group, to the clipboard.</summary>
