@@ -1,1 +1,26 @@
-.meal-form{background-color:var(--color-bg-surface);border:1px solid var(--color-border-subtle);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-6)}@media(min-width: 768px){.meal-form{padding:var(--space-4) var(--space-6)}}.ingredient-table{width:100%;min-width:32rem;margin-bottom:var(--space-3)}.ingredient-table__scroll{overflow-x:auto}.ingredient-table__input{width:100%}
+.meal-form {
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+@media (min-width: 768px) {
+  .meal-form {
+    padding: var(--space-4) var(--space-6);
+  }
+}
+
+.ingredient-table {
+  width: 100%;
+  min-width: 32rem;
+  margin-bottom: var(--space-3);
+}
+.ingredient-table__scroll {
+  overflow-x: auto;
+}
+.ingredient-table__input {
+  width: 100%;
+}
+
+/*# sourceMappingURL=MealsPage.razor.css.map */
