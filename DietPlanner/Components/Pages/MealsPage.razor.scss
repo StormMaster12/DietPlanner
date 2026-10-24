@@ -1,14 +1,28 @@
+@use "../../Styles/breakpoints" as bp;
+
 .meal-form {
     background-color: var(--color-bg-surface);
     border: 1px solid var(--color-border-subtle);
     border-radius: var(--radius-lg);
     padding: var(--space-4) var(--space-6);
     margin-bottom: var(--space-6);
+
+    @include bp.mobile {
+        padding: var(--space-4);
+    }
 }
 
 .ingredient-table {
     width: 100%;
     margin-bottom: var(--space-3);
+
+    @include bp.mobile {
+        min-width: 32rem;
+    }
+
+    &__scroll {
+        overflow-x: auto;
+    }
 
     &__input {
         width: 100%;

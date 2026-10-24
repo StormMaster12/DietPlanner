@@ -1,18 +1,29 @@
-<div class="nav__header">Diet Planner</div>
+<div class="nav__header">
+    <button type="button" class="nav__toggle" data-sidebar-toggle aria-controls="sidebar" aria-label="Toggle navigation" title="Toggle navigation">
+        <Icon Name="IconName.Menu" />
+    </button>
+    <span class="nav__label">Diet Planner</span>
+</div>
 
 <nav class="nav__links">
-    <NavLink href="" Match="NavLinkMatch.All" class="nav__link" ActiveClass="nav__link--active">Week Plan</NavLink>
-    <NavLink href="meals" class="nav__link" ActiveClass="nav__link--active">Meals</NavLink>
-    <NavLink href="meals/upload" class="nav__link" ActiveClass="nav__link--active">Upload Meals</NavLink>
-    <NavLink href="settings" class="nav__link" ActiveClass="nav__link--active">Settings</NavLink>
+    @foreach (NavItem item in NavItem.All)
+    {
+        <NavLink href="@item.Href" Match="@item.Match" class="nav__link" ActiveClass="nav__link--active" title="@item.Label" aria-label="@item.Label">
+            <Icon Name="@item.Icon" />
+            <span class="nav__label">@item.Label</span>
+        </NavLink>
+    }
 </nav>
 
-<button type="button" class="nav__theme-toggle" @onclick="ToggleThemeAsync">
-    @(IsDarkMode ? "☀️ Light mode" : "🌙 Dark mode")
+<button type="button" class="nav__theme-toggle" @onclick="ToggleThemeAsync" title="@ThemeToggleLabel" aria-label="@ThemeToggleLabel">
+    <Icon Name="@(IsDarkMode ? IconName.Sun : IconName.Moon)" />
+    <span class="nav__label">@ThemeToggleLabel</span>
 </button>
 
 @code {
     private bool IsDarkMode { get; set; }
+
+    private string ThemeToggleLabel => IsDarkMode ? "Light mode" : "Dark mode";
 
     [Inject]
     private IJSRuntime JsRuntime { get; set; } = null!;

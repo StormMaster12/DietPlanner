@@ -1,3 +1,5 @@
+@use "breakpoints" as bp;
+
 .table {
     width: 100%;
     border-collapse: collapse;
@@ -32,5 +34,58 @@
 
     &--under-target {
         color: var(--color-success-text);
+    }
+}
+
+// Below the tablet breakpoint a wide table becomes one card per row, with each
+// cell labelled from its data-label attribute - 7-10 numeric columns can't fit
+// a phone screen side by side.
+.table--stacked {
+    @include bp.mobile {
+        background-color: transparent;
+        box-shadow: none;
+
+        &,
+        tbody,
+        tfoot,
+        tr,
+        td {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        thead {
+            display: none;
+        }
+
+        tr {
+            margin-bottom: var(--space-3);
+            background-color: var(--color-bg-surface);
+            border: 1px solid var(--color-border-subtle);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+        }
+
+        td {
+            display: flex;
+            justify-content: space-between;
+            gap: var(--space-3);
+            text-align: right;
+
+            &:last-child {
+                border-bottom: none;
+            }
+
+            &:empty {
+                display: none;
+            }
+
+            &[data-label]::before {
+                content: attr(data-label);
+                font-weight: 600;
+                text-align: left;
+            }
+        }
     }
 }

@@ -73,27 +73,29 @@
             </div>
 
             <h3>Ingredients</h3>
-            <table class="ingredient-table">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Quantity</th>
-                        <th>Unit</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (MealIngredientFormModel ingredient in FormModel.Ingredients)
-                    {
+            <div class="ingredient-table__scroll">
+                <table class="ingredient-table">
+                    <thead>
                         <tr>
-                            <td><InputText class="ingredient-table__input" @bind-Value="ingredient.Name" placeholder="e.g. Chicken breast" /></td>
-                            <td><InputNumber class="ingredient-table__input" @bind-Value="ingredient.Quantity" /></td>
-                            <td><InputText class="ingredient-table__input" @bind-Value="ingredient.Unit" placeholder="e.g. g" /></td>
-                            <td><button type="button" class="btn btn--secondary" @onclick="() => RemoveIngredientRow(ingredient)">Remove</button></td>
+                            <th>Name</th>
+                            <th>Quantity</th>
+                            <th>Unit</th>
+                            <th></th>
                         </tr>
-                    }
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        @foreach (MealIngredientFormModel ingredient in FormModel.Ingredients)
+                        {
+                            <tr>
+                                <td><InputText class="ingredient-table__input" @bind-Value="ingredient.Name" placeholder="e.g. Chicken breast" /></td>
+                                <td><InputNumber class="ingredient-table__input" @bind-Value="ingredient.Quantity" /></td>
+                                <td><InputText class="ingredient-table__input" @bind-Value="ingredient.Unit" placeholder="e.g. g" /></td>
+                                <td><button type="button" class="btn btn--secondary" @onclick="() => RemoveIngredientRow(ingredient)">Remove</button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
             <button type="button" class="btn btn--secondary" @onclick="AddIngredientRow">Add ingredient</button>
 
             @if (FormValidationErrors.Count > 0)
@@ -122,7 +124,7 @@ else if (Meals.Count == 0)
 }
 else
 {
-    <table class="table">
+    <table class="table table--stacked">
         <thead>
             <tr>
                 <th>Slot</th>
@@ -141,15 +143,15 @@ else
             @foreach (MealDto meal in Meals.OrderBy(m => m.SlotKey).ThenBy(m => m.Name))
             {
                 <tr>
-                    <td>@meal.SlotKey</td>
-                    <td>@meal.Name</td>
-                    <td>@meal.MfName</td>
-                    <td class="table__value--numeric">@meal.Kcal</td>
-                    <td class="table__value--numeric">@meal.ProteinG</td>
-                    <td class="table__value--numeric">@meal.CarbsG</td>
-                    <td class="table__value--numeric">@meal.FibreG</td>
-                    <td class="table__value--numeric">@meal.Plants</td>
-                    <td>@meal.Ingredients.Count</td>
+                    <td data-label="Slot">@meal.SlotKey</td>
+                    <td data-label="Name">@meal.Name</td>
+                    <td data-label="MyFitnessPal name">@meal.MfName</td>
+                    <td class="table__value--numeric" data-label="Kcal">@meal.Kcal</td>
+                    <td class="table__value--numeric" data-label="Protein (g)">@meal.ProteinG</td>
+                    <td class="table__value--numeric" data-label="Carbs (g)">@meal.CarbsG</td>
+                    <td class="table__value--numeric" data-label="Fibre (g)">@meal.FibreG</td>
+                    <td class="table__value--numeric" data-label="Plants">@meal.Plants</td>
+                    <td data-label="Ingredients">@meal.Ingredients.Count</td>
                     <td>
                         <button class="btn btn--secondary" @onclick="() => StartEditingMeal(meal)">Edit</button>
                         <button class="btn btn--danger" @onclick="() => DeleteMealAsync(meal.MealId)">Delete</button>

@@ -57,7 +57,7 @@ else
                 </button>
             }
 
-            <table class="table">
+            <table class="table table--stacked">
                 <thead>
                     <tr>
                         <th>Slot</th>
@@ -73,15 +73,15 @@ else
                     @foreach (DayPlanMealDto meal in dayPlan.Meals)
                     {
                         <tr>
-                            <td>@meal.SlotKey</td>
-                            <td>
+                            <td data-label="Slot">@meal.SlotKey</td>
+                            <td data-label="Meal">
                                 @meal.Name
                             </td>
-                            <td class="table__value--numeric">@meal.Kcal</td>
-                            <td class="table__value--numeric">@meal.ProteinG</td>
-                            <td class="table__value--numeric">@meal.CarbsG</td>
-                            <td class="table__value--numeric">@meal.FibreG</td>
-                            <td class="table__value--numeric">@meal.Plants</td>
+                            <td class="table__value--numeric" data-label="Kcal">@meal.Kcal</td>
+                            <td class="table__value--numeric" data-label="Protein (g)">@meal.ProteinG</td>
+                            <td class="table__value--numeric" data-label="Carbs (g)">@meal.CarbsG</td>
+                            <td class="table__value--numeric" data-label="Fibre (g)">@meal.FibreG</td>
+                            <td class="table__value--numeric" data-label="Plants">@meal.Plants</td>
                         </tr>
                         @if (SuggestionErrorsByMealId.TryGetValue(meal.MealId, out string? suggestionError))
                         {
@@ -118,19 +118,19 @@ else
                 <tfoot>
                     <tr>
                         <td colspan="2"><strong>Total</strong></td>
-                        <td class="table__value--numeric">@dayPlan.Totals.Kcal</td>
-                        <td class="table__value--numeric">@dayPlan.Totals.ProteinG</td>
-                        <td class="table__value--numeric @CarbsCellModifierClass(dayPlan)">@dayPlan.Totals.CarbsG</td>
-                        <td class="table__value--numeric">@dayPlan.Totals.FibreG</td>
-                        <td class="table__value--numeric">@dayPlan.Totals.Plants</td>
+                        <td class="table__value--numeric" data-label="Kcal">@dayPlan.Totals.Kcal</td>
+                        <td class="table__value--numeric" data-label="Protein (g)">@dayPlan.Totals.ProteinG</td>
+                        <td class="table__value--numeric @CarbsCellModifierClass(dayPlan)" data-label="Carbs (g)">@dayPlan.Totals.CarbsG</td>
+                        <td class="table__value--numeric" data-label="Fibre (g)">@dayPlan.Totals.FibreG</td>
+                        <td class="table__value--numeric" data-label="Plants">@dayPlan.Totals.Plants</td>
                     </tr>
                     <tr>
                         <td colspan="2"><strong>Remaining vs. target</strong></td>
-                        <td class="table__value--numeric">@dayPlan.Remaining.Kcal</td>
-                        <td class="table__value--numeric">@dayPlan.Remaining.ProteinG</td>
-                        <td class="table__value--numeric @CarbsCellModifierClass(dayPlan)">@dayPlan.Remaining.CarbsG</td>
-                        <td class="table__value--numeric">@dayPlan.Remaining.FibreG</td>
-                        <td class="table__value--numeric">@dayPlan.Remaining.Plants</td>
+                        <td class="table__value--numeric" data-label="Kcal">@dayPlan.Remaining.Kcal</td>
+                        <td class="table__value--numeric" data-label="Protein (g)">@dayPlan.Remaining.ProteinG</td>
+                        <td class="table__value--numeric @CarbsCellModifierClass(dayPlan)" data-label="Carbs (g)">@dayPlan.Remaining.CarbsG</td>
+                        <td class="table__value--numeric" data-label="Fibre (g)">@dayPlan.Remaining.FibreG</td>
+                        <td class="table__value--numeric" data-label="Plants">@dayPlan.Remaining.Plants</td>
                     </tr>
                 </tfoot>
             </table>
