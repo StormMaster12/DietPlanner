@@ -1,8 +1,9 @@
 (function () {
     var storageKey = "sidebar";
 
-    // Must match the breakpoints in Styles/_breakpoints.scss.
-    var mobileQuery = window.matchMedia("(max-width: 767.98px)");
+    // 768px must match $tablet in Styles/_breakpoints.scss; 1024px only picks
+    // the default sidebar state, so it has no CSS counterpart.
+    var tabletUpQuery = window.matchMedia("(min-width: 768px)");
     var desktopQuery = window.matchMedia("(min-width: 1024px)");
 
     function storedPreference() {
@@ -40,7 +41,7 @@
         }
 
         if (target.closest("[data-sidebar-toggle]")) {
-            if (mobileQuery.matches) {
+            if (!tabletUpQuery.matches) {
                 setDrawerOpen(!isDrawerOpen());
             } else {
                 var current = document.documentElement.getAttribute("data-sidebar");
@@ -58,7 +59,7 @@
         }
     });
 
-    mobileQuery.addEventListener("change", function () {
+    tabletUpQuery.addEventListener("change", function () {
         setDrawerOpen(false);
     });
     desktopQuery.addEventListener("change", applySidebarState);

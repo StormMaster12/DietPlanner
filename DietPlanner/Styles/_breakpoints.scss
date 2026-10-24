@@ -1,13 +1,8 @@
-// Breakpoints are SCSS rather than CSS custom properties because media
-// queries can't read var(). Keep in sync with wwwroot/js/sidebar.js.
+// Styles are mobile-first: base rules target phones and these min-width
+// mixins layer larger-screen rules on top. Breakpoints are SCSS rather than
+// CSS custom properties because media queries can't read var(). Keep in sync
+// with wwwroot/js/sidebar.js.
 $tablet: 768px;
-$desktop: 1024px;
-
-@mixin mobile {
-    @media (max-width: $tablet - 0.02px) {
-        @content;
-    }
-}
 
 @mixin tablet-up {
     @media (min-width: $tablet) {

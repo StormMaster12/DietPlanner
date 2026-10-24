@@ -168,46 +168,69 @@ code {
   color: var(--color-success-text);
 }
 
-@media (max-width: 767.98px) {
+.table--stacked {
+  background-color: transparent;
+  box-shadow: none;
+}
+.table--stacked,
+.table--stacked tbody,
+.table--stacked tfoot,
+.table--stacked tr,
+.table--stacked td {
+  display: block;
+  box-sizing: border-box;
+}
+.table--stacked thead {
+  display: none;
+}
+.table--stacked tr {
+  margin-bottom: var(--space-3);
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.table--stacked td {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.table--stacked td:last-child {
+  border-bottom: none;
+}
+.table--stacked td:empty {
+  display: none;
+}
+.table--stacked td[data-label]::before {
+  content: attr(data-label);
+  font-weight: 600;
+}
+@media (min-width: 768px) {
   .table--stacked {
-    background-color: transparent;
-    box-shadow: none;
+    background-color: var(--color-bg-surface);
+    box-shadow: var(--shadow-sm);
   }
   .table--stacked,
+  .table--stacked thead,
   .table--stacked tbody,
   .table--stacked tfoot,
   .table--stacked tr,
-  .table--stacked td {
-    display: block;
-    width: 100%;
-    box-sizing: border-box;
-  }
-  .table--stacked thead {
-    display: none;
+  .table--stacked td,
+  .table--stacked td:empty {
+    display: revert;
   }
   .table--stacked tr {
-    margin-bottom: var(--space-3);
-    background-color: var(--color-bg-surface);
-    border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-  }
-  .table--stacked td {
-    display: flex;
-    justify-content: space-between;
-    gap: var(--space-3);
-    text-align: right;
+    margin-bottom: 0;
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
   }
   .table--stacked td:last-child {
-    border-bottom: none;
-  }
-  .table--stacked td:empty {
-    display: none;
+    border-bottom: 1px solid var(--color-border-subtle);
   }
   .table--stacked td[data-label]::before {
-    content: attr(data-label);
-    font-weight: 600;
-    text-align: left;
+    content: none;
   }
 }
 

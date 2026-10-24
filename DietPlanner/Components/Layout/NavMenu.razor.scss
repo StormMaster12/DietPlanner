@@ -86,7 +86,8 @@
     }
 }
 
-// The mobile drawer always shows labels, whatever the saved rail state.
+// Labels show by default (the mobile drawer always has room for them) and
+// only the tablet-up rail hides them.
 @include bp.tablet-up {
     [data-sidebar="rail"] .nav__label {
         display: none;
