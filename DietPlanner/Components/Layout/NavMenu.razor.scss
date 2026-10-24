@@ -1,9 +1,37 @@
+@use "../../Styles/breakpoints" as bp;
+
+// Horizontal padding is kept equal to (rail width - icon width) / 2 across the
+// header toggle, links and theme toggle, so the icons stay put when the
+// sidebar collapses to the rail and only the labels disappear.
 .nav {
     &__header {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
         font-size: 1.25rem;
         font-weight: 700;
-        padding: var(--space-5) var(--space-4);
+        padding: var(--space-4) var(--space-4);
         border-bottom: 1px solid var(--color-sidebar-border);
+    }
+
+    &__toggle {
+        display: flex;
+        flex-shrink: 0;
+        padding: var(--space-1);
+        background: none;
+        border: none;
+        border-radius: var(--radius-sm);
+        color: var(--color-sidebar-text);
+        cursor: pointer;
+
+        &:hover {
+            background-color: var(--color-sidebar-link-hover-bg);
+            color: var(--color-sidebar-text-active);
+        }
+    }
+
+    &__label {
+        white-space: nowrap;
     }
 
     &__links {
@@ -16,7 +44,9 @@
         // ::deep drops that requirement and falls back to a normal descendant
         // selector instead.
         ::deep .nav__link {
-            display: block;
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
             padding: 0.6rem var(--space-5);
             color: var(--color-sidebar-text);
             text-decoration: none;
@@ -35,7 +65,9 @@
     }
 
     &__theme-toggle {
-        display: block;
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
         width: 100%;
         margin-top: auto;
         padding: var(--space-3) var(--space-5);
@@ -43,6 +75,7 @@
         border: none;
         border-top: 1px solid var(--color-sidebar-border);
         color: var(--color-sidebar-text);
+        font: inherit;
         text-align: left;
         cursor: pointer;
 
@@ -50,5 +83,13 @@
             background-color: var(--color-sidebar-link-hover-bg);
             color: var(--color-sidebar-text-active);
         }
+    }
+}
+
+// Labels show by default (the mobile drawer always has room for them) and
+// only the tablet-up rail hides them.
+@include bp.tablet-up {
+    [data-sidebar="rail"] .nav__label {
+        display: none;
     }
 }

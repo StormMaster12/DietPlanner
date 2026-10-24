@@ -1,6 +1,7 @@
 .week-plan {
     &__toolbar {
         display: flex;
+        flex-wrap: wrap;
         gap: var(--space-3);
         margin-bottom: var(--space-4);
     }
@@ -14,6 +15,7 @@
         gap: var(--space-2);
         border-bottom: 1px solid var(--color-border);
         margin-bottom: var(--space-4);
+        overflow-x: auto;
     }
 
     &__tab {
@@ -24,6 +26,8 @@
         font-weight: 600;
         color: var(--color-text);
         border-bottom: 2px solid transparent;
+        flex-shrink: 0;
+        white-space: nowrap;
 
         &--active {
             border-bottom-color: var(--color-primary);

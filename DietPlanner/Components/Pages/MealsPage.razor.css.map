@@ -1,1 +1,1 @@
-{"version":3,"sourceRoot":"","sources":["MealsPage.razor.scss"],"names":[],"mappings":"AAAA;EACI;EACA;EACA;EACA;EACA;;;AAGJ;EACI;EACA;;AAEA;EACI","file":"MealsPage.razor.css"}
+{"version":3,"sourceRoot":"","sources":["MealsPage.razor.scss","../../Styles/_breakpoints.scss"],"names":[],"mappings":"AAEA;EACI;EACA;EACA;EACA;EACA;;ACAA;EDLJ;IAQQ;;;;AAMR;EACI;EACA;EACA;;AAEA;EACI;;AAGJ;EACI","file":"MealsPage.razor.css"}

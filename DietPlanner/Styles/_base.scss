@@ -10,3 +10,9 @@ h2,
 h3 {
     margin-top: 0;
 }
+
+// Long inline code samples (e.g. the CSV format on the upload page) would
+// otherwise force the page wider than a phone screen.
+code {
+    overflow-wrap: anywhere;
+}

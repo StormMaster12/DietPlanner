@@ -1,9 +1,22 @@
 @inherits LayoutComponentBase
+@implements IDisposable
 
 <div class="layout">
-    <div class="layout__sidebar">
+    <header class="layout__topbar">
+        <button type="button" class="layout__topbar-toggle" data-sidebar-toggle aria-controls="sidebar" aria-label="Open navigation">
+            <Icon Name="IconName.Menu" />
+        </button>
+        <span class="layout__topbar-title">@CurrentPageTitle</span>
+    </header>
+
+    <div class="layout__backdrop" data-sidebar-close></div>
+
+    <aside id="sidebar" class="layout__sidebar">
         <NavMenu />
-    </div>
+        <button type="button" class="layout__sidebar-close" data-sidebar-close aria-label="Close navigation">
+            <Icon Name="IconName.ChevronLeft" />
+        </button>
+    </aside>
 
     <main class="layout__main">
         <div class="layout__content">
@@ -11,3 +24,29 @@
         </div>
     </main>
 </div>
+
+@code {
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = null!;
+
+    private string CurrentPageTitle
+    {
+        get
+        {
+            string path = NavigationManager.ToBaseRelativePath(NavigationManager.Uri).Split('?', '#')[0].TrimEnd('/');
+            return NavItem.All.FirstOrDefault(item => item.Href == path)?.Label ?? "Diet Planner";
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+}

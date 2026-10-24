@@ -1,3 +1,5 @@
+@use "breakpoints" as bp;
+
 .table {
     width: 100%;
     border-collapse: collapse;
@@ -32,5 +34,85 @@
 
     &--under-target {
         color: var(--color-success-text);
+    }
+}
+
+// A wide table that renders as one card per row on phones, with each cell
+// labelled from its data-label attribute - 7-10 numeric columns can't fit a
+// phone screen side by side. tablet-up reverts it to a normal table.
+.table--stacked {
+    background-color: transparent;
+    box-shadow: none;
+
+    &,
+    tbody,
+    tfoot,
+    tr,
+    td {
+        display: block;
+        box-sizing: border-box;
+    }
+
+    thead {
+        display: none;
+    }
+
+    tr {
+        margin-bottom: var(--space-3);
+        background-color: var(--color-bg-surface);
+        border: 1px solid var(--color-border-subtle);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+    }
+
+    td {
+        display: flex;
+        justify-content: space-between;
+        gap: var(--space-3);
+
+        &:last-child {
+            border-bottom: none;
+        }
+
+        &:empty {
+            display: none;
+        }
+
+        &[data-label]::before {
+            content: attr(data-label);
+            font-weight: 600;
+        }
+    }
+
+    @include bp.tablet-up {
+        background-color: var(--color-bg-surface);
+        box-shadow: var(--shadow-sm);
+
+        // revert hands each element back its browser-default table display.
+        &,
+        thead,
+        tbody,
+        tfoot,
+        tr,
+        td,
+        td:empty {
+            display: revert;
+        }
+
+        tr {
+            margin-bottom: 0;
+            background-color: transparent;
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        td:last-child {
+            border-bottom: 1px solid var(--color-border-subtle);
+        }
+
+        td[data-label]::before {
+            content: none;
+        }
     }
 }

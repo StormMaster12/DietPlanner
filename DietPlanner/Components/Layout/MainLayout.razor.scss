@@ -1,23 +1,148 @@
+@use "../../Styles/breakpoints" as bp;
+
+// The base rules are the phone layout - a top bar plus an overlay drawer -
+// and tablet-up swaps the drawer for an in-flow sidebar.
 .layout {
     display: flex;
+    flex-direction: column;
     min-height: 100vh;
 
-    &__sidebar {
+    &__topbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
         display: flex;
-        flex-direction: column;
-        width: var(--sidebar-width);
-        flex-shrink: 0;
+        align-items: center;
+        gap: var(--space-2);
+        height: 3rem;
+        padding: 0 var(--space-2);
         background-color: var(--color-sidebar-bg);
         color: var(--color-sidebar-text-active);
     }
 
+    &__topbar-toggle {
+        display: flex;
+        padding: var(--space-2);
+        background: none;
+        border: none;
+        color: inherit;
+        cursor: pointer;
+    }
+
+    &__topbar-title {
+        font-weight: 700;
+    }
+
+    // Fixed-position overlay so opening the drawer never reflows the page.
+    // visibility (delayed until the slide-out finishes) keeps the closed
+    // drawer's links out of the tab order. The drawer state lives on <html>
+    // (set by wwwroot/js/sidebar.js) so it survives Blazor re-renders.
+    &__sidebar {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 30;
+        display: flex;
+        flex-direction: column;
+        width: min(var(--sidebar-width), 85vw);
+        background-color: var(--color-sidebar-bg);
+        color: var(--color-sidebar-text-active);
+        transform: translateX(-100%);
+        visibility: hidden;
+        transition: transform 200ms ease, visibility 0s linear 200ms;
+
+        [data-sidebar-drawer="open"] & {
+            transform: none;
+            visibility: visible;
+            transition: transform 200ms ease;
+        }
+    }
+
+    &__backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        background-color: rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 200ms ease;
+
+        [data-sidebar-drawer="open"] & {
+            opacity: 1;
+            pointer-events: auto;
+        }
+    }
+
+    &__sidebar-close {
+        position: absolute;
+        top: var(--space-4);
+        right: -2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 3rem;
+        padding: 0;
+        background-color: var(--color-sidebar-bg);
+        border: none;
+        border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+        color: var(--color-sidebar-text-active);
+        cursor: pointer;
+    }
+
     &__main {
         flex: 1;
+        // Lets wide content scroll inside the page instead of stretching the
+        // flex item past the viewport.
+        min-width: 0;
         background-color: var(--color-bg-page);
     }
 
     &__content {
-        padding: var(--space-6) var(--space-8);
+        padding: var(--space-4);
         max-width: var(--content-max-width);
+    }
+
+    @include bp.tablet-up {
+        flex-direction: row;
+
+        &__topbar,
+        &__backdrop,
+        &__sidebar-close {
+            display: none;
+        }
+
+        // The sidebar sits in the flow and pushes the content; the rail
+        // state is on <html> so it's already applied on first paint.
+        &__sidebar {
+            position: sticky;
+            bottom: auto;
+            left: auto;
+            z-index: auto;
+            width: var(--sidebar-width);
+            height: 100vh;
+            flex-shrink: 0;
+            overflow-x: hidden;
+            overflow-y: auto;
+            transform: none;
+            visibility: visible;
+            transition: width 200ms ease;
+
+            [data-sidebar="rail"] & {
+                width: var(--sidebar-rail-width);
+            }
+        }
+
+        &__content {
+            padding: var(--space-6) var(--space-8);
+        }
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .layout__sidebar,
+    .layout__backdrop {
+        transition: none;
     }
 }
