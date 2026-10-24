@@ -189,7 +189,14 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+// .NET 8 Blazor doesn't fingerprint app.css, DietPlanner.styles.css or the js/ files, and
+// without a Cache-Control header browsers cache them heuristically - so after a deploy a
+// phone could keep the old CSS against the new markup. no-cache makes the browser revalidate
+// every time, which costs a 304 against the ETag when nothing has changed.
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = context => context.Context.Response.Headers.CacheControl = "no-cache",
+});
 app.UseAntiforgery();
 
 app.MapSettingsEndpoints();
