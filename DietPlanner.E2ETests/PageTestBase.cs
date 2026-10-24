@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using Microsoft.Playwright;
 using Microsoft.Playwright.NUnit;
 using NUnit.Framework;
@@ -38,6 +39,50 @@ public abstract class PageTestBase : PageTest
     /// </summary>
     protected Task StubAnthropicResponseAsync(string anthropicResponseBody) =>
         _factory.StubAnthropicResponseAsync(anthropicResponseBody);
+
+    protected Task ClearAnthropicStubsAsync() => _factory.ClearAnthropicStubsAsync();
+
+    protected Task<IReadOnlyList<string>> GetAnthropicRequestBodiesAsync() => _factory.GetAnthropicRequestBodiesAsync();
+
+    /// <summary>
+    /// Creates (or replaces) a meal through the app's own API, so tests that aren't about meal
+    /// entry can set up data without driving the meals page.
+    /// </summary>
+    protected async Task UpsertMealAsync(Guid mealId, string name, int fibreG, params (string Name, decimal Quantity, string? Unit)[] ingredients)
+    {
+        using HttpClient client = _factory.CreateAppClient();
+        using HttpResponseMessage response = await client.PutAsJsonAsync("api/meals", new
+        {
+            mealId,
+            name,
+            slotKey = 1,
+            kcal = 300,
+            proteinG = 10,
+            carbsG = 40,
+            fibreG,
+            plants = 1,
+            zoeNotes = (string?)null,
+            mfName = name,
+            notes = (string?)null,
+            ingredients = ingredients.Select(i => new { name = i.Name, quantity = i.Quantity, unit = i.Unit }),
+        });
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>Plans a meal into the Breakfast slot on the given date through the app's own API.</summary>
+    protected async Task PlanBreakfastAsync(DateOnly date, Guid mealId, decimal portionMultiplier = 1m)
+    {
+        using HttpClient client = _factory.CreateAppClient();
+        using HttpResponseMessage response = await client.PutAsJsonAsync("api/week/entry", new
+        {
+            date,
+            slotKey = 1,
+            mealId,
+            portionMultiplier,
+            notes = (string?)null,
+        });
+        response.EnsureSuccessStatusCode();
+    }
 
     /// <summary>
     /// Navigates relative to the running server, then waits for network idle so the Blazor Server

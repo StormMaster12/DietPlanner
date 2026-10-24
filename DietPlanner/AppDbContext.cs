@@ -16,7 +16,8 @@ public sealed class AppDbContext : DbContext
     public DbSet<Endpoints.Meal.MealIngredient> MealIngredients => Set<Endpoints.Meal.MealIngredient>();
     public DbSet<WeekPlanEntry> WeekPlanEntries => Set<WeekPlanEntry>();
     public DbSet<Settings> Settings => Set<Settings>();
-    public DbSet<MealAdditionSuggestionCacheEntry> MealAdditionSuggestionCache => Set<MealAdditionSuggestionCacheEntry>();
+    public DbSet<MealAdditionSuggestionSet> MealAdditionSuggestionSets => Set<MealAdditionSuggestionSet>();
+    public DbSet<MealSuggestedAddition> MealSuggestedAdditions => Set<MealSuggestedAddition>();
     public DbSet<ShoppingListGroupingCacheEntry> ShoppingListGroupingCache => Set<ShoppingListGroupingCacheEntry>();
 
     protected override void OnModelCreating(ModelBuilder b)
@@ -26,7 +27,8 @@ public sealed class AppDbContext : DbContext
         b.ConfigureMealIngredientEntity();
         b.AddWeekPlanEntry();
         b.AddSettings();
-        b.ConfigureMealAdditionSuggestionCacheEntryEntity();
+        b.ConfigureMealAdditionSuggestionSetEntity();
+        b.ConfigureMealSuggestedAdditionEntity();
         b.ConfigureShoppingListGroupingCacheEntryEntity();
     }
 }

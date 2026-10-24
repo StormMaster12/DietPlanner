@@ -1,14 +1,11 @@
 namespace DietPlanner.Endpoints.DayPlan;
 
 /// <summary>
-/// A single meal's details plus how far the day it's planned on is below its fibre/plant
-/// targets, sent to an LLM so it can suggest additions that close the gap.
+/// Which meal to suggest additions for, plus how far the day it's planned on is below its
+/// fibre/plant targets so the LLM can size its suggestions to close the gap. The meal's own
+/// contents are read from the database, so suggestions are always based on a single portion.
 /// </summary>
 public sealed record MealAdditionSuggestionRequest(
     Guid MealId,
-    string MealName,
-    string? ZoeNotes,
-    string? Notes,
-    IReadOnlyList<DayPlanIngredientDto> Ingredients,
     int FibreShortfallG,
     int PlantsShortfall);
