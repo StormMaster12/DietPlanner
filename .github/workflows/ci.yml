@@ -4,10 +4,14 @@ on:
   pull_request:
   push:
     branches: [master]
+  # Lets update-visual-baselines.yml re-run CI after committing new baselines.
+  workflow_dispatch:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Pinned rather than ubuntu-latest: the visual baselines depend on the runner's fonts, so an
+    # image upgrade should be a deliberate baseline refresh, not a surprise red build.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -32,6 +36,14 @@ jobs:
 
       - name: Run Playwright e2e tests against the built container
         run: dotnet test DietPlanner.E2ETests/DietPlanner.E2ETests.csproj --no-build --configuration Release --logger "console;verbosity=normal"
+
+      - name: Upload visual diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-diffs
+          path: DietPlanner.E2ETests/TestResults/VisualDiffs/
+          if-no-files-found: ignore
 
   deploy:
     needs: test
