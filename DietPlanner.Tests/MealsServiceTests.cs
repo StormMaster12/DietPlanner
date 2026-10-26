@@ -1,5 +1,7 @@
+using DietPlanner.Endpoints.DayPlan;
 using DietPlanner.Endpoints.Meal;
 using DietPlanner.Endpoints.Slots;
+using Microsoft.EntityFrameworkCore;
 
 namespace DietPlanner.Tests;
 
@@ -182,4 +184,56 @@ public sealed class MealsServiceTests
         Assert.That(result, Is.EqualTo(DeleteResult.NotFound));
     }
 
+
+    private async Task<Guid> SeedMealWithSavedSuggestionAsync()
+    {
+        await SeedBreakfastSlotAsync();
+        Guid mealId = Guid.NewGuid();
+        using (AppDbContext db = _database.CreateContext())
+        {
+            await new MealsService(db).UpsertMealAsync(NewMealRequest(mealId), CancellationToken.None);
+        }
+
+        using (AppDbContext db = _database.CreateContext())
+        {
+            MealEntry meal = db.Meals.Include(m => m.Ingredients).Single(m => m.Id == mealId);
+            db.MealAdditionSuggestionSets.Add(new MealAdditionSuggestionSet
+            {
+                MealId = mealId,
+                MealFingerprint = MealAdditionFingerprint.Compute(meal),
+                CreatedAtUtc = DateTime.UtcNow,
+                Additions =
+                [
+                    new MealSuggestedAddition { Id = Guid.NewGuid(), MealId = mealId, SortOrder = 0, Name = "Chia seeds", Quantity = 1, Unit = "tbsp", Reason = "Adds fibre." },
+                ],
+            });
+            await db.SaveChangesAsync();
+        }
+
+        return mealId;
+    }
+
+    [Test]
+    public async Task GetMealsAsync_IncludesSavedSuggestionsForAnUnchangedMeal()
+    {
+        Guid mealId = await SeedMealWithSavedSuggestionAsync();
+        using AppDbContext db = _database.CreateContext();
+
+        MealDto meal = (await new MealsService(db).GetMealsAsync(CancellationToken.None)).Single(m => m.MealId == mealId);
+
+        Assert.That(meal.SuggestedAdditions, Is.EqualTo(new[] { new SuggestedMealAddition("Chia seeds", 1, "tbsp", "Adds fibre.") }));
+    }
+
+    [Test]
+    public async Task GetMealAsync_AfterTheMealIsEdited_OmitsItsOutdatedSuggestions()
+    {
+        Guid mealId = await SeedMealWithSavedSuggestionAsync();
+        using AppDbContext db = _database.CreateContext();
+        MealsService service = new(db);
+
+        await service.UpsertMealAsync(NewMealRequest(mealId) with { Notes = "Now with honey" }, CancellationToken.None);
+        MealDto? meal = await service.GetMealAsync(mealId, CancellationToken.None);
+
+        Assert.That(meal!.SuggestedAdditions, Is.Null);
+    }
 }

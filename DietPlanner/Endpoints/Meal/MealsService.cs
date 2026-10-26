@@ -1,4 +1,5 @@
-﻿using DietPlanner.Endpoints.Slots;
+﻿using DietPlanner.Endpoints.DayPlan;
+using DietPlanner.Endpoints.Slots;
 using Microsoft.EntityFrameworkCore;
 
 namespace DietPlanner.Endpoints.Meal;
@@ -19,7 +20,8 @@ public sealed class MealsService : IMealsService
             .Include(m => m.Ingredients)
             .ToListAsync(cancellationToken);
 
-        return meals.Select(ToDto).ToList();
+        Dictionary<Guid, MealAdditionSuggestionSet> suggestionSets = await LoadSuggestionSetsAsync(meals.Select(m => m.Id), cancellationToken);
+        return meals.Select(m => ToDto(m, suggestionSets.GetValueOrDefault(m.Id))).ToList();
     }
 
     public async Task<MealDto?> GetMealAsync(Guid mealId, CancellationToken cancellationToken)
@@ -29,7 +31,13 @@ public sealed class MealsService : IMealsService
             .Include(x => x.Ingredients)
             .SingleOrDefaultAsync(x => x.Id == mealId, cancellationToken);
 
-        return m is null ? null : ToDto(m);
+        if (m is null)
+        {
+            return null;
+        }
+
+        Dictionary<Guid, MealAdditionSuggestionSet> suggestionSets = await LoadSuggestionSetsAsync([m.Id], cancellationToken);
+        return ToDto(m, suggestionSets.GetValueOrDefault(m.Id));
     }
 
     public async Task<(UpsertMealResult Result, MealDto? Meal)> UpsertMealAsync(UpsertMealRequest request, CancellationToken cancellationToken)
@@ -100,7 +108,8 @@ public sealed class MealsService : IMealsService
 
         await _db.SaveChangesAsync(cancellationToken);
 
-        return (UpsertMealResult.Success, ToDto(existing));
+        Dictionary<Guid, MealAdditionSuggestionSet> suggestionSets = await LoadSuggestionSetsAsync([existing.Id], cancellationToken);
+        return (UpsertMealResult.Success, ToDto(existing, suggestionSets.GetValueOrDefault(existing.Id)));
     }
 
     public async Task<DeleteResult> DeleteMealAsync(Guid mealId, CancellationToken cancellationToken)
@@ -116,12 +125,24 @@ public sealed class MealsService : IMealsService
         return DeleteResult.Success;
     }
 
-    private static MealDto ToDto(MealEntry m)
+    private Task<Dictionary<Guid, MealAdditionSuggestionSet>> LoadSuggestionSetsAsync(IEnumerable<Guid> mealIds, CancellationToken cancellationToken)
+    {
+        List<Guid> ids = mealIds.ToList();
+        return _db.MealAdditionSuggestionSets
+            .AsNoTracking()
+            .Where(s => ids.Contains(s.MealId))
+            .Include(s => s.Additions)
+            .ToDictionaryAsync(s => s.MealId, cancellationToken);
+    }
+
+    private static MealDto ToDto(MealEntry m, MealAdditionSuggestionSet? suggestionSet)
     {
         IReadOnlyList<MealIngredientDto> ingredients = m.Ingredients
             .Select(i => new MealIngredientDto(i.Id, i.Name, i.Quantity, i.Unit))
             .ToList();
 
-        return new MealDto(m.Id, m.Name, m.SlotKey, m.Kcal, m.ProteinG, m.CarbsG, m.FibreG, m.Plants, m.ZoeNotes, m.MfName, m.Notes, ingredients);
+        return new MealDto(
+            m.Id, m.Name, m.SlotKey, m.Kcal, m.ProteinG, m.CarbsG, m.FibreG, m.Plants, m.ZoeNotes, m.MfName, m.Notes, ingredients,
+            suggestionSet?.SuggestionsFor(m));
     }
 }

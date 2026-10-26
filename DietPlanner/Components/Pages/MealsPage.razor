@@ -93,6 +93,15 @@
                                 <td><button type="button" class="btn btn--secondary" @onclick="() => RemoveIngredientRow(ingredient)">Remove</button></td>
                             </tr>
                         }
+                        @foreach (SuggestedMealAddition suggestion in EditingMealSuggestions)
+                        {
+                            <tr class="ingredient-table__suggestion">
+                                <td>@suggestion.Ingredient <em>(suggested)</em></td>
+                                <td>@suggestion.Quantity.ToString("0.##")</td>
+                                <td>@suggestion.Unit</td>
+                                <td>@suggestion.Reason</td>
+                            </tr>
+                        }
                     </tbody>
                 </table>
             </div>
@@ -151,7 +160,13 @@ else
                     <td class="table__value--numeric" data-label="Carbs (g)">@meal.CarbsG</td>
                     <td class="table__value--numeric" data-label="Fibre (g)">@meal.FibreG</td>
                     <td class="table__value--numeric" data-label="Plants">@meal.Plants</td>
-                    <td data-label="Ingredients">@meal.Ingredients.Count</td>
+                    <td data-label="Ingredients">
+                        @meal.Ingredients.Count
+                        @if (meal.SuggestedAdditions is { Count: > 0 } suggested)
+                        {
+                            <span>(+@suggested.Count suggested)</span>
+                        }
+                    </td>
                     <td>
                         <button class="btn btn--secondary" @onclick="() => StartEditingMeal(meal)">Edit</button>
                         <button class="btn btn--danger" @onclick="() => DeleteMealAsync(meal.MealId)">Delete</button>
@@ -168,6 +183,12 @@ else
     private MealFormModel FormModel { get; set; } = new();
     private bool IsFormVisible { get; set; }
     private bool IsEditingExistingMeal { get; set; }
+
+    /// <summary>
+    /// AI-suggested additions saved for the meal being edited, shown read-only beneath its own
+    /// ingredients. They're managed from the week plan page, so saving the form doesn't touch them.
+    /// </summary>
+    private IReadOnlyList<SuggestedMealAddition> EditingMealSuggestions { get; set; } = [];
     private string? ErrorMessage { get; set; }
     private List<string> FormValidationErrors { get; set; } = new();
 
@@ -195,6 +216,7 @@ else
     {
         FormModel = new MealFormModel { MealId = Guid.NewGuid(), SlotKey = Slots?.FirstOrDefault()?.Key ?? SlotKey.Breakfast };
         IsEditingExistingMeal = false;
+        EditingMealSuggestions = [];
         IsFormVisible = true;
         FormValidationErrors.Clear();
         ErrorMessage = null;
@@ -220,6 +242,7 @@ else
                 .ToList()
         };
         IsEditingExistingMeal = true;
+        EditingMealSuggestions = meal.SuggestedAdditions ?? [];
         IsFormVisible = true;
         FormValidationErrors.Clear();
         ErrorMessage = null;
