@@ -20,12 +20,7 @@ public static class SlotsEndpoints
     public static async Task<Results<NoContent, NotFound>> DeleteSlotsAsync(SlotKey key, ISlotsService slotsService, CancellationToken cancellationToken)
     {
         DeleteResult result = await slotsService.DeleteSlotAsync(key, cancellationToken);
-        return result switch
-        {
-            DeleteResult.NotFound => TypedResults.NotFound(),
-            DeleteResult.Success => TypedResults.NoContent(),
-            _ => throw new NotImplementedException()
-        };
+        return result.ToHttpResult();
     }
 
     public static async Task<Ok<IEnumerable<SlotDto>>> GetSlotsAsync(ISlotsService slotsService, CancellationToken cancellationToken)

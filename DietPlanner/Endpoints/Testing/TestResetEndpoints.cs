@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 
 namespace DietPlanner.Endpoints.Testing;
@@ -10,19 +11,19 @@ public static class TestResetEndpoints
 {
     public static void MapTestResetEndpoints(this WebApplication app)
     {
-        app.MapPost("/__test__/reset", async (AppDbContext db) =>
+        app.MapPost("/__test__/reset", async Task<Ok> (AppDbContext db, CancellationToken cancellationToken) =>
         {
             // Slots are fixed reference data seeded once at startup and are never touched here -
             // everything else is per-test state the e2e suite needs wiped between tests. Deleted
             // in FK dependency order since Restrict prevents the DB from cascading for us.
-            await db.WeekPlanEntries.ExecuteDeleteAsync();
-            await db.MealSuggestedAdditions.ExecuteDeleteAsync();
-            await db.MealAdditionSuggestionSets.ExecuteDeleteAsync();
-            await db.ShoppingListGroupingCache.ExecuteDeleteAsync();
-            await db.MealIngredients.ExecuteDeleteAsync();
-            await db.Meals.ExecuteDeleteAsync();
-            await db.Settings.ExecuteDeleteAsync();
-            return Results.Ok();
+            await db.WeekPlanEntries.ExecuteDeleteAsync(cancellationToken);
+            await db.MealSuggestedAdditions.ExecuteDeleteAsync(cancellationToken);
+            await db.MealAdditionSuggestionSets.ExecuteDeleteAsync(cancellationToken);
+            await db.ShoppingListGroupingCache.ExecuteDeleteAsync(cancellationToken);
+            await db.MealIngredients.ExecuteDeleteAsync(cancellationToken);
+            await db.Meals.ExecuteDeleteAsync(cancellationToken);
+            await db.Settings.ExecuteDeleteAsync(cancellationToken);
+            return TypedResults.Ok();
         });
     }
 }

@@ -56,39 +56,27 @@ public static class WeekPlanEndpoints
         };
     }
 
-    public static async Task<Results<ValidationProblem, BadRequest<string>, NoContent>> SetWeekAsync([FromBody] IReadOnlyList<UpsertWeekEntryRequest> entries, [FromServices] IValidator<UpsertWeekEntryRequest> validator, [FromServices] IWeekPlanService weekPlanService, CancellationToken cancellationToken)
+    public static async Task<Results<ValidationProblem, BadRequest<string>, NoContent>> SetWeekAsync([FromBody] IReadOnlyList<UpsertWeekEntryRequest> entries, [FromServices] IValidator<IReadOnlyList<UpsertWeekEntryRequest>> validator, [FromServices] IWeekPlanService weekPlanService, CancellationToken cancellationToken)
     {
-        foreach (var e in entries)
+        var validationResult = await validator.ValidateAsync(entries, cancellationToken);
+        if (!validationResult.IsValid)
         {
-            var vr = await validator.ValidateAsync(e, cancellationToken);
-            if (!vr.IsValid) return TypedResults.ValidationProblem(vr.ToDictionary());
+            return TypedResults.ValidationProblem(validationResult.ToDictionary());
         }
 
-        try
+        var (result, _) = await weekPlanService.SetWeekAsync(entries, cancellationToken);
+        return result switch
         {
-            var (result, count) = await weekPlanService.SetWeekAsync(entries, cancellationToken);
-            return result switch
-            {
-                UpsertWeekEntryResult.InvalidSlot => TypedResults.BadRequest("Invalid slot in batch"),
-                UpsertWeekEntryResult.UnknownMeal => TypedResults.BadRequest("Unknown meal in batch"),
-                UpsertWeekEntryResult.Success => TypedResults.NoContent(),
-                _ => throw new NotImplementedException()
-            };
-        }
-        catch (ArgumentOutOfRangeException)
-        {
-            return TypedResults.BadRequest("entries must be between 1 and 28 items");
-        }
+            UpsertWeekEntryResult.InvalidSlot => TypedResults.BadRequest("Invalid slot in batch"),
+            UpsertWeekEntryResult.UnknownMeal => TypedResults.BadRequest("Unknown meal in batch"),
+            UpsertWeekEntryResult.Success => TypedResults.NoContent(),
+            _ => throw new NotImplementedException()
+        };
     }
 
     public static async Task<Results<NoContent, NotFound>> DeleteEntryAsync([FromRoute] DateOnly date, [FromRoute] SlotKey slotKey, [FromServices] IWeekPlanService weekPlanService, CancellationToken cancellationToken)
     {
-        var result = await weekPlanService.DeleteEntryAsync(date, slotKey, cancellationToken);
-        return result switch
-        {
-            DeleteResult.NotFound => TypedResults.NotFound(),
-            DeleteResult.Success => TypedResults.NoContent(),
-            _ => throw new NotImplementedException()
-        };
+        DeleteResult result = await weekPlanService.DeleteEntryAsync(date, slotKey, cancellationToken);
+        return result.ToHttpResult();
     }
 }

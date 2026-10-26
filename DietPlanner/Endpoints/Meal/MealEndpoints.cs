@@ -52,12 +52,7 @@ public static class MealsEndpoints
     public static async Task<Results<NoContent, NotFound>> DeleteMealAsync([FromRoute] Guid mealId, [FromServices] IMealsService mealsService, CancellationToken cancellationToken)
     {
         DeleteResult result = await mealsService.DeleteMealAsync(mealId, cancellationToken);
-        return result switch
-        {
-            DeleteResult.NotFound => TypedResults.NotFound(),
-            DeleteResult.Success => TypedResults.NoContent(),
-            _ => throw new NotImplementedException()
-        };
+        return result.ToHttpResult();
     }
 
     public static async Task<Results<Ok<MealImportResult>, BadRequest<string>>> ImportMealsFromPdfAsync(
