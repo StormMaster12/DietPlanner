@@ -1,4 +1,4 @@
-namespace DietPlanner.Endpoints.Meal;
+namespace DietPlanner.Anthropic;
 
 /// <summary>
 /// Configuration for <see cref="AnthropicApiService"/>, the single entry point every feature uses to

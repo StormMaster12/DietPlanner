@@ -1,4 +1,5 @@
 using DietPlanner;
+using DietPlanner.Anthropic;
 using DietPlanner.Authentication;
 using DietPlanner.Components;
 using DietPlanner.Endpoints.DayPlan;
@@ -36,7 +37,6 @@ builder.Logging.AddOpenTelemetry(otelOptions =>
     otelOptions.AddConsoleExporter();
 });
 
-// Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 var services = builder.Services;
 services.AddEndpointsApiExplorer();
@@ -145,8 +145,6 @@ using (IServiceScope scope = app.Services.CreateScope())
         await dbContext.SaveChangesAsync();
     }
 }
-
-// Configure the HTTP request pipeline.
 
 // Must run before other middleware so it can catch exceptions thrown further down the pipeline;
 // pairs with AddProblemDetails() above to turn unhandled exceptions into a ProblemDetails response.

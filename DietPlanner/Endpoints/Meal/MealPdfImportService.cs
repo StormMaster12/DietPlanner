@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using DietPlanner.Endpoints.Slots;
 using Microsoft.Extensions.Logging;
 using UglyToad.PdfPig;
+using DietPlanner.Anthropic;
 
 namespace DietPlanner.Endpoints.Meal;
 
@@ -45,6 +46,14 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
         Respond with ONLY a raw JSON array of these objects - no markdown fences, no commentary. If
         the text contains no identifiable meals, respond with an empty array [].
         """;
+
+    private static readonly AnthropicPrompt Prompt = new(
+        SystemPrompt,
+        MaxTokens: 8192,
+        TruncatedResponseMessage:
+            "The Anthropic response was truncated because it described too many meals to fit in a " +
+            "single reply, even after splitting the PDF by chapter. Try splitting the source PDF into " +
+            "smaller files and importing them separately.");
 
     private const int MaxChunkChars = 8000;
 
@@ -269,7 +278,7 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
             {
                 extractedRows.AddRange(await CallAnthropicAsync(chunks[chunkIndex], cancellationToken));
             }
-            catch (Exception ex) when (ex is HttpRequestException or JsonException)
+            catch (AnthropicCallFailedException ex)
             {
                 LogAnthropicCallFailed(ex);
                 string part = chunks.Count > 1 ? $"part {chunkIndex + 1} of {chunks.Count} of " : "";
@@ -330,17 +339,7 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
 
     private async Task<List<ExtractedMealRow>> CallAnthropicAsync(string extractedText, CancellationToken cancellationToken)
     {
-        string json = await _anthropicApi.SendMessageAsync(
-            SystemPrompt,
-            extractedText,
-            maxTokens: 8192,
-            truncatedResponseMessage:
-                "The Anthropic response was truncated because it described too many meals to fit in a " +
-                "single reply, even after splitting the PDF by chapter. Try splitting the source PDF into " +
-                "smaller files and importing them separately.",
-            cancellationToken);
-
-        return JsonSerializer.Deserialize<List<ExtractedMealRow>>(json) ?? [];
+        return await _anthropicApi.SendForJsonAsync<List<ExtractedMealRow>>(Prompt, extractedText, cancellationToken) ?? [];
     }
 
     private sealed record ExtractedMealRow(

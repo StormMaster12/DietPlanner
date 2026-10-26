@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DietPlanner.Anthropic;
 using DietPlanner.Endpoints.Meal;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -55,6 +56,11 @@ public sealed partial class IngredientGroupingService : IIngredientGroupingServi
 
         Every input index must appear exactly once in the output, in the same order.
         """;
+
+    private static readonly AnthropicPrompt Prompt = new(
+        SystemPrompt,
+        MaxTokens: 8192,
+        TruncatedResponseMessage: "The Anthropic response was truncated because the shopping list was too large to fit in a single reply.");
 
     private const int MaxLinesPerChunk = 150;
 
@@ -122,7 +128,7 @@ public sealed partial class IngredientGroupingService : IIngredientGroupingServi
                     }
                 }
             }
-            catch (Exception ex) when (ex is HttpRequestException or JsonException)
+            catch (AnthropicCallFailedException ex)
             {
                 LogAnthropicCallFailed(ex);
                 errors.Add($"Could not group part of the shopping list: {ex.Message}");
@@ -174,14 +180,7 @@ public sealed partial class IngredientGroupingService : IIngredientGroupingServi
         var requestLines = chunk.Select(c => new RequestLine(c.Index, c.Ingredient.Name, c.Ingredient.Quantity, c.Ingredient.Unit)).ToList();
         string userContent = JsonSerializer.Serialize(requestLines);
 
-        string json = await _anthropicApi.SendMessageAsync(
-            SystemPrompt,
-            userContent,
-            maxTokens: 8192,
-            truncatedResponseMessage: "The Anthropic response was truncated because the shopping list was too large to fit in a single reply.",
-            cancellationToken);
-
-        return JsonSerializer.Deserialize<List<GroupedLineResult>>(json) ?? [];
+        return await _anthropicApi.SendForJsonAsync<List<GroupedLineResult>>(Prompt, userContent, cancellationToken) ?? [];
     }
 
     private sealed record RequestLine(
