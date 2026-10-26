@@ -1,20 +1,11 @@
+using DietPlanner.BackgroundJobs;
+
 namespace DietPlanner.Endpoints.Meal;
 
-public enum IngredientNormalizationJobStatus
+public static class IngredientNormalizationJob
 {
-    Running,
-    Completed,
-    Failed,
+    public static Guid StartIngredientNormalization(this IBackgroundJobRunner<IngredientNormalizationResult> jobs)
+        => jobs.Start(
+            "Ingredient names could not be normalized.",
+            (services, cancellationToken) => services.GetRequiredService<IIngredientNormalizationService>().NormalizeIngredientNamesAsync(cancellationToken));
 }
-
-/// <summary>
-/// Snapshot of a background ingredient normalization job, returned by
-/// <see cref="IIngredientNormalizationJobService.GetStatus"/> for the upload page to poll.
-/// <see cref="Result"/> is only populated once <see cref="Status"/> is
-/// <see cref="IngredientNormalizationJobStatus.Completed"/>; <see cref="ErrorMessage"/> only once
-/// it's <see cref="IngredientNormalizationJobStatus.Failed"/>.
-/// </summary>
-public sealed record IngredientNormalizationJobStatusView(
-    IngredientNormalizationJobStatus Status,
-    IngredientNormalizationResult? Result,
-    string? ErrorMessage);

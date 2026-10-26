@@ -1,5 +1,4 @@
 @page "/"
-@using Microsoft.Extensions.Logging
 
 <h1>Week Plan</h1>
 
@@ -212,8 +211,8 @@ else
 
     /// <summary>
     /// The dates currently fetching bulk suggestions. All suggestion buttons are disabled while
-    /// this is non-empty - only one day's loop may run at a time, since it shares a scoped
-    /// <see cref="AppDbContext"/> with every other day's loop via <see cref="MealAdditionSuggestionService"/>.
+    /// this is non-empty - only one day's loop may run at a time, since two days sharing a meal
+    /// would otherwise both try to save that meal's suggestion set.
     /// </summary>
     private HashSet<DateOnly> DatesSuggestingAdditions { get; set; } = new();
 
@@ -225,9 +224,8 @@ else
     private int CompletedSuggestionRuns { get; set; }
 
     /// <summary>
-    /// True while week generation, shopping-list grouping, or bulk suggestions is in flight, so
-    /// every button backed by the page's scoped <see cref="AppDbContext"/> can be disabled and
-    /// none of those operations overlap on the same context.
+    /// True while week generation, shopping-list grouping, or bulk suggestions is in flight. They
+    /// all read or change the same week's meals and shopping list, so none of them may overlap.
     /// </summary>
     private bool IsDbBusy => IsBusy || IsGroupingShoppingList || DatesSuggestingAdditions.Count > 0;
 
@@ -238,6 +236,7 @@ else
     private Dictionary<Guid, string> SuggestionErrorsByMealId { get; set; } = new();
 
     private const int DaysInWeek = 7;
+    private static readonly TimeSpan JobPollInterval = TimeSpan.FromMilliseconds(500);
 
     [Inject]
     private IWeekPlanGeneratorService WeekPlanGeneratorService { get; set; } = null!;
@@ -246,16 +245,13 @@ else
     private IDayPlanService DayPlanService { get; set; } = null!;
 
     [Inject]
-    private IIngredientGroupingService GroupingService { get; set; } = null!;
+    private IBackgroundJobRunner<IngredientGroupingResult> GroupingJobs { get; set; } = null!;
 
     [Inject]
-    private IMealAdditionSuggestionService MealAdditionSuggestionService { get; set; } = null!;
+    private IBackgroundJobRunner<MealAdditionSuggestionResult> SuggestionJobs { get; set; } = null!;
 
     [Inject]
     private IJSRuntime JsRuntime { get; set; } = null!;
-
-    [Inject]
-    private ILogger<DietPlannerPage> Logger { get; set; } = null!;
 
     protected override async Task OnInitializedAsync()
     {
@@ -288,9 +284,9 @@ else
     }
 
     /// <summary>
-    /// Sends every meal in this day to the AI suggestion service, one at a time (the service shares
-    /// a scoped <c>AppDbContext</c>, so calls can't run concurrently), along with how far the day is
-    /// below its fibre/plant targets. The service saves each meal's additions, so they're shown under
+    /// Sends every meal in this day to the AI suggestion service as a background job, one at a time
+    /// so each meal's result renders as soon as it's ready, along with how far the day is below its
+    /// fibre/plant targets. The service saves each meal's additions, so they're shown under
     /// every occurrence of that meal this week and added to the shopping list.
     /// </summary>
     private async Task SuggestAllAdditionsAsync(DayPlanResponseDto dayPlan)
@@ -308,23 +304,21 @@ else
 
                 SuggestionErrorsByMealId.Remove(meal.MealId);
 
-                try
-                {
-                    MealAdditionSuggestionResult result = await MealAdditionSuggestionService.SuggestAdditionsAsync(request, CancellationToken.None);
+                Guid jobId = SuggestionJobs.StartSuggestAdditions(request);
+                BackgroundJobStatusView<MealAdditionSuggestionResult> job =
+                    await SuggestionJobs.WaitForCompletionAsync(jobId, JobPollInterval, CancellationToken.None);
 
-                    if (result.Errors.Count > 0)
-                    {
-                        SuggestionErrorsByMealId[meal.MealId] = string.Join(" ", result.Errors);
-                    }
-                    else
-                    {
-                        ApplySuggestedAdditions(meal.MealId, result.Suggestions);
-                    }
-                }
-                catch (Exception ex)
+                if (job.Result is null)
                 {
-                    Logger.LogError(ex, "Meal addition suggestion failed for meal '{MealName}'", meal.Name);
                     SuggestionErrorsByMealId[meal.MealId] = $"Could not get suggestions for '{meal.Name}'.";
+                }
+                else if (job.Result.Errors.Count > 0)
+                {
+                    SuggestionErrorsByMealId[meal.MealId] = string.Join(" ", job.Result.Errors);
+                }
+                else
+                {
+                    ApplySuggestedAdditions(meal.MealId, job.Result.Suggestions);
                 }
 
                 StateHasChanged();
@@ -384,8 +378,17 @@ else
 
         try
         {
-            IngredientGroupingResult result = await GroupingService.GroupIngredientsAsync(WeekStartDate, WeeklyShoppingList, CancellationToken.None);
+            Guid jobId = GroupingJobs.StartGroupIngredients(WeekStartDate, WeeklyShoppingList);
+            BackgroundJobStatusView<IngredientGroupingResult> job =
+                await GroupingJobs.WaitForCompletionAsync(jobId, JobPollInterval, CancellationToken.None);
 
+            if (job.Result is null)
+            {
+                GroupingErrorMessage = job.ErrorMessage;
+                return;
+            }
+
+            IngredientGroupingResult result = job.Result;
             GroupedShoppingList = result.Ingredients
                 .GroupBy(i => i.Category)
                 .OrderBy(g => IngredientGroupingService.Categories.ToList().IndexOf(g.Key))

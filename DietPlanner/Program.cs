@@ -1,6 +1,7 @@
 using DietPlanner;
 using DietPlanner.Anthropic;
 using DietPlanner.Authentication;
+using DietPlanner.BackgroundJobs;
 using DietPlanner.Components;
 using DietPlanner.Endpoints.DayPlan;
 using DietPlanner.Endpoints.Meal;
@@ -76,11 +77,10 @@ services.AddScoped<IIngredientNormalizationService, IngredientNormalizationServi
 services.AddScoped<IIngredientGroupingService, IngredientGroupingService>();
 services.AddScoped<IMealAdditionSuggestionService, MealAdditionSuggestionService>();
 
-// Runs PDF imports / ingredient normalization on a detached background task so a slow multi-chunk
-// Anthropic call doesn't hold the Blazor circuit's request open long enough to hit a SignalR/proxy
-// timeout; the upload page polls these singletons for job status instead of awaiting inline.
-services.AddSingleton<IMealPdfImportJobService, MealPdfImportJobService>();
-services.AddSingleton<IIngredientNormalizationJobService, IngredientNormalizationJobService>();
+// Runs slow Anthropic-backed work (PDF import, ingredient normalization, meal suggestions,
+// shopping-list grouping) on a detached background task so it can't hold a Blazor circuit's
+// request open long enough to hit a SignalR/proxy timeout; callers poll for the job's status.
+services.AddSingleton(typeof(IBackgroundJobRunner<>), typeof(BackgroundJobRunner<>));
 
 // Default DataProtection key storage is ephemeral (in-memory/local temp dir). Combined with
 // auto_stop_machines/min_machines_running=0 in fly.toml, every cold start spun up a brand new

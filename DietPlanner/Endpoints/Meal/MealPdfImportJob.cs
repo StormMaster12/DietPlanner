@@ -1,19 +1,19 @@
+using DietPlanner.BackgroundJobs;
+
 namespace DietPlanner.Endpoints.Meal;
 
-public enum MealPdfImportJobStatus
+public static class MealPdfImportJob
 {
-    Running,
-    Completed,
-    Failed,
+    /// <summary>
+    /// Large PDFs need several chunked Anthropic calls, so both the upload page and the API run the
+    /// import as a background job and poll for its result.
+    /// </summary>
+    public static Guid StartPdfImport(this IBackgroundJobRunner<MealImportResult> jobs, byte[] pdfFileContent)
+        => jobs.Start(
+            "The PDF could not be imported. Check that it's a valid, unencrypted PDF file.",
+            async (services, cancellationToken) =>
+            {
+                using MemoryStream pdfStream = new(pdfFileContent);
+                return await services.GetRequiredService<IMealPdfImportService>().ImportFromPdfAsync(pdfStream, cancellationToken);
+            });
 }
-
-/// <summary>
-/// Snapshot of a background PDF import job, returned by <see cref="IMealPdfImportJobService.GetStatus"/>
-/// for the upload page to poll. <see cref="Result"/> is only populated once <see cref="Status"/> is
-/// <see cref="MealPdfImportJobStatus.Completed"/>; <see cref="ErrorMessage"/> only once it's
-/// <see cref="MealPdfImportJobStatus.Failed"/>.
-/// </summary>
-public sealed record MealPdfImportJobStatusView(
-    MealPdfImportJobStatus Status,
-    MealImportResult? Result,
-    string? ErrorMessage);

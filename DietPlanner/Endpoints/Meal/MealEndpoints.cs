@@ -1,4 +1,5 @@
-﻿using DietPlanner.Endpoints.Slots;
+﻿using DietPlanner.BackgroundJobs;
+using DietPlanner.Endpoints.Slots;
 using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -16,7 +17,8 @@ public static class MealsEndpoints
         group.MapGet("/{mealId}", GetMealAsync).WithOpenApi();
         group.MapPut("/", UpsertMealAsync).WithOpenApi();
         group.MapDelete("/{mealId}", DeleteMealAsync).WithOpenApi();
-        group.MapPost("/import-pdf", ImportMealsFromPdfAsync).WithOpenApi().DisableAntiforgery();
+        group.MapPost("/import-pdf", StartImportMealsFromPdfAsync).WithOpenApi().DisableAntiforgery();
+        group.MapGet("/import-pdf/{jobId}", GetImportMealsFromPdfStatus).WithOpenApi();
         group.MapPost("/normalize-ingredients", StartNormalizeIngredients).WithOpenApi().DisableAntiforgery();
         group.MapGet("/normalize-ingredients/{jobId}", GetNormalizeIngredientsStatus).WithOpenApi();
 
@@ -55,26 +57,34 @@ public static class MealsEndpoints
         return result.ToHttpResult();
     }
 
-    public static async Task<Results<Ok<MealImportResult>, BadRequest<string>>> ImportMealsFromPdfAsync(
-        IFormFile file, [FromServices] IMealPdfImportService mealPdfImportService, CancellationToken cancellationToken)
+    public static async Task<Results<Ok<Guid>, BadRequest<string>>> StartImportMealsFromPdfAsync(
+        IFormFile file, [FromServices] IBackgroundJobRunner<MealImportResult> importJobs, CancellationToken cancellationToken)
     {
         if (file.Length == 0)
         {
             return TypedResults.BadRequest("Uploaded file is empty.");
         }
 
-        await using Stream pdfFileStream = file.OpenReadStream();
-        MealImportResult result = await mealPdfImportService.ImportFromPdfAsync(pdfFileStream, cancellationToken);
-        return TypedResults.Ok(result);
+        await using Stream uploadedFileStream = file.OpenReadStream();
+        using MemoryStream buffer = new();
+        await uploadedFileStream.CopyToAsync(buffer, cancellationToken);
+        return TypedResults.Ok(importJobs.StartPdfImport(buffer.ToArray()));
     }
 
-    public static Ok<Guid> StartNormalizeIngredients([FromServices] IIngredientNormalizationJobService normalizationJobService)
-        => TypedResults.Ok(normalizationJobService.Start());
-
-    public static Results<Ok<IngredientNormalizationJobStatusView>, NotFound> GetNormalizeIngredientsStatus(
-        [FromRoute] Guid jobId, [FromServices] IIngredientNormalizationJobService normalizationJobService)
+    public static Results<Ok<BackgroundJobStatusView<MealImportResult>>, NotFound> GetImportMealsFromPdfStatus(
+        [FromRoute] Guid jobId, [FromServices] IBackgroundJobRunner<MealImportResult> importJobs)
     {
-        IngredientNormalizationJobStatusView? status = normalizationJobService.GetStatus(jobId);
+        BackgroundJobStatusView<MealImportResult>? status = importJobs.GetStatus(jobId);
+        return status is null ? TypedResults.NotFound() : TypedResults.Ok(status);
+    }
+
+    public static Ok<Guid> StartNormalizeIngredients([FromServices] IBackgroundJobRunner<IngredientNormalizationResult> normalizationJobs)
+        => TypedResults.Ok(normalizationJobs.StartIngredientNormalization());
+
+    public static Results<Ok<BackgroundJobStatusView<IngredientNormalizationResult>>, NotFound> GetNormalizeIngredientsStatus(
+        [FromRoute] Guid jobId, [FromServices] IBackgroundJobRunner<IngredientNormalizationResult> normalizationJobs)
+    {
+        BackgroundJobStatusView<IngredientNormalizationResult>? status = normalizationJobs.GetStatus(jobId);
         return status is null ? TypedResults.NotFound() : TypedResults.Ok(status);
     }
 }

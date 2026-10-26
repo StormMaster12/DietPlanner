@@ -156,4 +156,38 @@ public sealed class ValidatorTests
 
         Assert.That(result.IsValid, Is.True);
     }
+
+    private static UpsertWeekEntryRequest ValidWeekEntry(int dayOffset)
+        => new(new DateOnly(2026, 1, 5).AddDays(dayOffset), SlotKey.Breakfast, Guid.NewGuid(), 1m, null);
+
+    [TestCase(0)]
+    [TestCase(29)]
+    public void SetWeekEntriesValidator_RejectsBatchSizeOutsideRange(int count)
+    {
+        SetWeekEntriesValidator validator = new();
+
+        ValidationResult result = validator.Validate(Enumerable.Range(0, count).Select(ValidWeekEntry).ToList());
+
+        Assert.That(result.IsValid, Is.False);
+    }
+
+    [Test]
+    public void SetWeekEntriesValidator_RejectsAnInvalidEntry()
+    {
+        SetWeekEntriesValidator validator = new();
+
+        ValidationResult result = validator.Validate(new[] { ValidWeekEntry(0), ValidWeekEntry(1) with { PortionMultiplier = 0m } });
+
+        Assert.That(result.IsValid, Is.False);
+    }
+
+    [Test]
+    public void SetWeekEntriesValidator_AcceptsAFullWeek()
+    {
+        SetWeekEntriesValidator validator = new();
+
+        ValidationResult result = validator.Validate(Enumerable.Range(0, SetWeekEntriesValidator.MaxEntries).Select(ValidWeekEntry).ToList());
+
+        Assert.That(result.IsValid, Is.True);
+    }
 }
