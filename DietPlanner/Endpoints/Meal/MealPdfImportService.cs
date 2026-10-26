@@ -99,9 +99,9 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
             return new MealImportResult(0, 0, ["The PDF contained no extractable text."]);
         }
 
-        (List<MealImportRow> parsedRows, List<string> rowErrors) = await ExtractRowsAsync(extractedText, cancellationToken);
+        ParsedMealRows parsed = await ExtractRowsAsync(extractedText, cancellationToken);
 
-        return await MealImportUpsert.UpsertRowsAsync(_db, parsedRows, rowErrors, cancellationToken);
+        return await MealImportUpsert.UpsertRowsAsync(_db, parsed, cancellationToken);
     }
 
     private static string ExtractText(Stream pdfFileContent)
@@ -259,7 +259,7 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
 
     private sealed record TextChapter(string Heading, string Body);
 
-    private async Task<(List<MealImportRow> ParsedRows, List<string> RowErrors)> ExtractRowsAsync(
+    private async Task<ParsedMealRows> ExtractRowsAsync(
         string extractedText, CancellationToken cancellationToken)
     {
         var rowErrors = new List<string>();
@@ -267,7 +267,7 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
         if (!_anthropicApi.IsConfigured)
         {
             rowErrors.Add("PDF import is not configured: missing Anthropic API key.");
-            return ([], rowErrors);
+            return new ParsedMealRows([], rowErrors);
         }
 
         var extractedRows = new List<ExtractedMealRow>();
@@ -334,7 +334,7 @@ public sealed partial class MealPdfImportService : IMealPdfImportService
             }
         }
 
-        return (parsedRows, rowErrors);
+        return new ParsedMealRows(parsedRows, rowErrors);
     }
 
     private async Task<List<ExtractedMealRow>> CallAnthropicAsync(string extractedText, CancellationToken cancellationToken)

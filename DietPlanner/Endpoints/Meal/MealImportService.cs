@@ -23,16 +23,14 @@ public sealed class MealImportService : IMealImportService
         await csvFileContent.CopyToAsync(bufferedContent, cancellationToken);
         bufferedContent.Position = 0;
 
-        (List<MealImportRow> parsedRows, List<string> rowErrors) = ParseCsv(bufferedContent);
-
-        return await MealImportUpsert.UpsertRowsAsync(_db, parsedRows, rowErrors, cancellationToken);
+        return await MealImportUpsert.UpsertRowsAsync(_db, ParseCsv(bufferedContent), cancellationToken);
     }
 
     /// <summary>
     /// Reads every data row of the CSV individually so a single malformed row (bad number, unknown
     /// slot name, etc.) is reported and skipped rather than aborting the whole upload.
     /// </summary>
-    private static (List<MealImportRow> ParsedRows, List<string> RowErrors) ParseCsv(Stream csvFileContent)
+    private static ParsedMealRows ParseCsv(Stream csvFileContent)
     {
         var parsedRows = new List<MealImportRow>();
         var rowErrors = new List<string>();
@@ -91,7 +89,7 @@ public sealed class MealImportService : IMealImportService
             }
         }
 
-        return (parsedRows, rowErrors);
+        return new ParsedMealRows(parsedRows, rowErrors);
     }
 
     private static int ParseRequiredInt(CsvReader csvReader, string columnName)

@@ -11,14 +11,13 @@ internal static class MealImportUpsert
 {
     public static async Task<MealImportResult> UpsertRowsAsync(
         AppDbContext db,
-        List<MealImportRow> parsedRows,
-        List<string> rowErrors,
+        ParsedMealRows parsed,
         CancellationToken cancellationToken)
     {
         int insertedCount = 0;
         int updatedCount = 0;
 
-        foreach (MealImportRow row in parsedRows)
+        foreach (MealImportRow row in parsed.Rows)
         {
             MealEntry? existingMeal = await db.Meals
                 .Include(m => m.Ingredients)
@@ -72,7 +71,7 @@ internal static class MealImportUpsert
 
         await db.SaveChangesAsync(cancellationToken);
 
-        return new MealImportResult(insertedCount, updatedCount, rowErrors);
+        return new MealImportResult(insertedCount, updatedCount, parsed.Errors);
     }
 
     private static List<MealIngredient> ToIngredientEntities(IReadOnlyList<MealImportIngredientRow>? ingredients, Guid mealId)
