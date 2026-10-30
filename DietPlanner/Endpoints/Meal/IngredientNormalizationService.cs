@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using DietPlanner.Anthropic;
 
 namespace DietPlanner.Endpoints.Meal;
 
@@ -34,6 +35,12 @@ public sealed partial class IngredientNormalizationService : IIngredientNormaliz
         commentary, in this exact shape:
         [{"original": "<the exact input name>", "normalized": "<the canonical name to use instead>"}]
         """;
+
+    private static readonly AnthropicPrompt Prompt = new(
+        SystemPrompt,
+        MaxTokens: 8192,
+        TruncatedResponseMessage:
+            "The Anthropic response was truncated because the ingredient list was too large to fit in a single reply.");
 
     private const int MaxNamesPerChunk = 150;
 
@@ -90,7 +97,7 @@ public sealed partial class IngredientNormalizationService : IIngredientNormaliz
                     }
                 }
             }
-            catch (Exception ex) when (ex is HttpRequestException or JsonException)
+            catch (AnthropicCallFailedException ex)
             {
                 LogAnthropicCallFailed(ex);
                 string part = chunks.Count > 1 ? $"part {chunkIndex + 1} of {chunks.Count} of " : "";
@@ -152,14 +159,7 @@ public sealed partial class IngredientNormalizationService : IIngredientNormaliz
     {
         string userContent = JsonSerializer.Serialize(names);
 
-        string json = await _anthropicApi.SendMessageAsync(
-            SystemPrompt,
-            userContent,
-            maxTokens: 8192,
-            truncatedResponseMessage: "The Anthropic response was truncated because the ingredient list was too large to fit in a single reply.",
-            cancellationToken);
-
-        return JsonSerializer.Deserialize<List<NormalizedNamePair>>(json) ?? [];
+        return await _anthropicApi.SendForJsonAsync<List<NormalizedNamePair>>(Prompt, userContent, cancellationToken) ?? [];
     }
 
     private sealed record NormalizedNamePair(

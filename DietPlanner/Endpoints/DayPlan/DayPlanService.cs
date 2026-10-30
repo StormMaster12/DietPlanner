@@ -49,12 +49,9 @@ public sealed class DayPlanService : IDayPlanService
                     .Select(i => new DayPlanIngredientDto(i.Name, Math.Round(i.Quantity * mult, 2), i.Unit))
                     .ToList();
 
-                // Suggestions generated before the meal was last edited no longer describe it, so
-                // they're hidden (and left out of the shopping list) until regenerated.
-                List<SuggestedMealAddition>? additions =
-                    suggestionSets.TryGetValue(m.Id, out MealAdditionSuggestionSet? set) && set.MealFingerprint == MealAdditionFingerprint.Compute(m)
-                        ? MealAdditionSuggestionService.ToSuggestions(set).Select(a => a.ScaledBy(mult)).ToList()
-                        : null;
+                List<SuggestedMealAddition>? additions = suggestionSets.GetValueOrDefault(m.Id)?.SuggestionsFor(m)
+                    ?.Select(a => a.ScaledBy(mult))
+                    .ToList();
 
                 return new DayPlanMealDto(
                     date,

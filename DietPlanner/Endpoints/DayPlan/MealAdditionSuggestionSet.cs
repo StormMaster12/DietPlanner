@@ -18,6 +18,16 @@ public sealed class MealAdditionSuggestionSet
     public DateTime CreatedAtUtc { get; set; }
 
     public List<MealSuggestedAddition> Additions { get; set; } = new();
+
+    /// <summary>
+    /// The saved single-portion suggestions, in the order the AI gave them, or null if
+    /// <paramref name="meal"/> has been edited since they were generated - they no longer describe
+    /// it, so they're hidden (and left out of the shopping list) until regenerated.
+    /// </summary>
+    public IReadOnlyList<SuggestedMealAddition>? SuggestionsFor(MealEntry meal)
+        => MealFingerprint == MealAdditionFingerprint.Compute(meal)
+            ? MealAdditionSuggestionService.ToSuggestions(this)
+            : null;
 }
 
 public static class ConfigureMealAdditionSuggestionSet

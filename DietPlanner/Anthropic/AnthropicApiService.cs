@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 
-namespace DietPlanner.Endpoints.Meal;
+namespace DietPlanner.Anthropic;
 
 public sealed class AnthropicApiService : IAnthropicApiService
 {
@@ -20,43 +20,59 @@ public sealed class AnthropicApiService : IAnthropicApiService
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(_options.ApiKey);
 
-    public async Task<string> SendMessageAsync(
-        string systemPrompt, string userContent, int maxTokens, string truncatedResponseMessage, CancellationToken cancellationToken)
+    public async Task<T?> SendForJsonAsync<T>(AnthropicPrompt prompt, string userContent, CancellationToken cancellationToken)
     {
         if (!IsConfigured)
         {
-            throw new HttpRequestException("Anthropic API key is not configured.");
+            throw new AnthropicCallFailedException("Anthropic API key is not configured.");
         }
 
-        var requestBody = new AnthropicRequest(_options.Model, maxTokens, systemPrompt, [new AnthropicMessage("user", userContent)]);
+        var requestBody = new AnthropicRequest(_options.Model, prompt.MaxTokens, prompt.SystemPrompt, [new AnthropicMessage("user", userContent)]);
 
         using HttpRequestMessage request = new(HttpMethod.Post, _options.BaseUrl);
         request.Headers.Add("x-api-key", _options.ApiKey);
         request.Headers.Add("anthropic-version", AnthropicVersion);
         request.Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
 
-        using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
-        string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
+        string responseBody;
+        try
         {
-            throw new HttpRequestException($"Anthropic API returned {(int)response.StatusCode}: {responseBody}");
+            using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
+            responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new AnthropicCallFailedException(
+                    $"The Anthropic API returned an error ({(int)response.StatusCode}).",
+                    new HttpRequestException($"Anthropic API returned {(int)response.StatusCode}: {responseBody}"));
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new AnthropicCallFailedException("Could not reach the Anthropic API.", ex);
         }
 
-        AnthropicResponse? anthropicResponse = JsonSerializer.Deserialize<AnthropicResponse>(responseBody);
-        string? text = anthropicResponse?.Content?.FirstOrDefault(c => c.Type == "text")?.Text;
-
-        if (string.IsNullOrWhiteSpace(text))
+        try
         {
-            throw new JsonException("Anthropic API returned no text content.");
-        }
+            AnthropicResponse? anthropicResponse = JsonSerializer.Deserialize<AnthropicResponse>(responseBody);
+            string? text = anthropicResponse?.Content?.FirstOrDefault(c => c.Type == "text")?.Text;
 
-        if (anthropicResponse?.StopReason == "max_tokens")
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                throw new AnthropicCallFailedException("The Anthropic API returned an empty reply.");
+            }
+
+            if (anthropicResponse?.StopReason == "max_tokens")
+            {
+                throw new AnthropicCallFailedException(prompt.TruncatedResponseMessage);
+            }
+
+            return JsonSerializer.Deserialize<T>(StripMarkdownFences(text));
+        }
+        catch (JsonException ex)
         {
-            throw new JsonException(truncatedResponseMessage);
+            throw new AnthropicCallFailedException("The Anthropic API returned a reply that could not be read.", ex);
         }
-
-        return StripMarkdownFences(text);
     }
 
     private static string StripMarkdownFences(string text)

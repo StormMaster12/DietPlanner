@@ -17,17 +17,15 @@ public static class SettingsEndpoints
         return endpoints;
     }
 
-    public static Task<SettingsDto> GetSettings([FromServices] ISettingsService svc, CancellationToken ct)
-    {
-        return svc.GetAsync(ct);
-    }
+    public static async Task<Ok<SettingsDto>> GetSettings([FromServices] ISettingsService svc, CancellationToken ct)
+        => TypedResults.Ok(await svc.GetAsync(ct));
 
     public static async Task<Results<ValidationProblem, Ok<SettingsDto>>> PutSettings([FromBody] UpdateSettingsRequest req, [FromServices] ISettingsService svc, [FromServices] IValidator<UpdateSettingsRequest> validator, CancellationToken ct)
     {
-        FluentValidation.Results.ValidationResult valid = await validator.ValidateAsync(req, ct);
-        if (!valid.IsValid)
+        FluentValidation.Results.ValidationResult validationResult = await validator.ValidateAsync(req, ct);
+        if (!validationResult.IsValid)
         {
-            return TypedResults.ValidationProblem(valid.ToDictionary());
+            return TypedResults.ValidationProblem(validationResult.ToDictionary());
         }
 
         SettingsDto updated = await svc.UpdateAsync(req, ct);

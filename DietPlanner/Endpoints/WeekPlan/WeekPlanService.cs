@@ -57,7 +57,7 @@ public sealed class WeekPlanService : IWeekPlanService
 
     public async Task<(UpsertWeekEntryResult Result, int Count)> SetWeekAsync(IReadOnlyList<UpsertWeekEntryRequest> entries, CancellationToken cancellationToken)
     {
-        if (entries.Count is < 1 or > 28)
+        if (entries.Count is < SetWeekEntriesValidator.MinEntries or > SetWeekEntriesValidator.MaxEntries)
         {
             throw new ArgumentOutOfRangeException(nameof(entries));
         }

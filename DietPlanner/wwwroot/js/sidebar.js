@@ -6,9 +6,25 @@
     var tabletUpQuery = window.matchMedia("(min-width: 768px)");
     var desktopQuery = window.matchMedia("(min-width: 1024px)");
 
+    // localStorage throws when the browser blocks site data, so the choice is
+    // also kept in memory - the toggle then still works until the page reloads.
+    var sessionPreference = null;
+
     function storedPreference() {
-        var stored = localStorage.getItem(storageKey);
+        var stored = sessionPreference;
+        try {
+            stored = localStorage.getItem(storageKey) || stored;
+        } catch (e) {
+        }
         return stored === "expanded" || stored === "rail" ? stored : null;
+    }
+
+    function storePreference(value) {
+        sessionPreference = value;
+        try {
+            localStorage.setItem(storageKey, value);
+        } catch (e) {
+        }
     }
 
     // Without a saved choice the default follows the viewport, so it's
@@ -45,7 +61,7 @@
                 setDrawerOpen(!isDrawerOpen());
             } else {
                 var current = document.documentElement.getAttribute("data-sidebar");
-                localStorage.setItem(storageKey, current === "rail" ? "expanded" : "rail");
+                storePreference(current === "rail" ? "expanded" : "rail");
                 applySidebarState();
             }
         } else if (target.closest("[data-sidebar-close]") || target.closest(".nav__link")) {

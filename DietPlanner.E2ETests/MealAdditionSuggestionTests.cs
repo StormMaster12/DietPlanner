@@ -157,4 +157,20 @@ public sealed class MealAdditionSuggestionTests : PageTestBase
         string groupingRequest = requests.Single(r => r.Contains("supermarket aisle"));
         Assert.That(groupingRequest, Does.Contain("Chia seeds"));
     }
+
+    [Test]
+    public async Task SavedSuggestions_AreShownInTheMealsIngredientList()
+    {
+        await SeedPorridgeOnMondayAsync();
+        await StubAnthropicResponseAsync(BuildAnthropicResponse(ChiaSeedsSuggestion));
+        await GoToAsync("");
+        await SuggestAdditionsForFirstDayAsync();
+        await Expect(SuggestionLists.First).ToContainTextAsync("Chia seeds");
+
+        await GoToAsync("meals");
+        await Expect(Page.Locator("td[data-label='Ingredients']").First).ToContainTextAsync("(+1 suggested)");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Edit" }).First.ClickAsync();
+
+        await Expect(Page.Locator(".ingredient-table__suggestion")).ToContainTextAsync("Chia seeds (suggested)");
+    }
 }

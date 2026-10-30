@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DietPlanner.Anthropic;
 using DietPlanner.Endpoints.Meal;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -25,6 +26,11 @@ public sealed partial class MealAdditionSuggestionService : IMealAdditionSuggest
 
         If you cannot think of any reasonable addition, return an empty array.
         """;
+
+    private static readonly AnthropicPrompt Prompt = new(
+        SystemPrompt,
+        MaxTokens: 2048,
+        TruncatedResponseMessage: "The Anthropic response was truncated.");
 
     private readonly IAnthropicApiService _anthropicApi;
     private readonly AppDbContext _db;
@@ -74,7 +80,7 @@ public sealed partial class MealAdditionSuggestionService : IMealAdditionSuggest
         {
             results = await CallAnthropicAsync(BuildUserContent(meal, request), cancellationToken);
         }
-        catch (Exception ex) when (ex is HttpRequestException or JsonException)
+        catch (AnthropicCallFailedException ex)
         {
             // Errors are only logged and shown in the moment, never saved, so the next request
             // for this meal tries the API again rather than replaying a stored failure.
@@ -133,14 +139,7 @@ public sealed partial class MealAdditionSuggestionService : IMealAdditionSuggest
 
     private async Task<List<SuggestedAdditionResult>> CallAnthropicAsync(string userContent, CancellationToken cancellationToken)
     {
-        string json = await _anthropicApi.SendMessageAsync(
-            SystemPrompt,
-            userContent,
-            maxTokens: 2048,
-            truncatedResponseMessage: "The Anthropic response was truncated.",
-            cancellationToken);
-
-        return JsonSerializer.Deserialize<List<SuggestedAdditionResult>>(json) ?? [];
+        return await _anthropicApi.SendForJsonAsync<List<SuggestedAdditionResult>>(Prompt, userContent, cancellationToken) ?? [];
     }
 
     private sealed record RequestIngredient(
