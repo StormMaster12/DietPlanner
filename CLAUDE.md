@@ -112,6 +112,12 @@ Fly.io via `flyctl deploy --remote-only`.
 - Use `GoToAsync(relativePath)` from `PageTestBase` to navigate — it waits for
   `NetworkIdle` so the Blazor SignalR circuit is connected before interacting with the
   page (interacting earlier silently no-ops).
+- Visual regression tests (`VisualRegressionTests`, `[Category("Visual")]`) compare full-page
+  screenshots with PNG baselines committed in `DietPlanner.E2ETests/VisualBaselines/`. Baselines
+  are only valid for CI's Linux Chromium. Don't generate or commit them from a local machine.
+  To update them, add the `update-visual-baselines` label to the PR. The
+  `update-visual-baselines.yml` workflow regenerates them and commits them to the branch, and the
+  reviewer approves the image diffs. See `VisualBaselines/README.md`.
 
 ## Configuration
 

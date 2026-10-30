@@ -85,6 +85,23 @@ public abstract class PageTestBase : PageTest
     }
 
     /// <summary>
+    /// Screenshots the whole page and compares it to the committed baseline named
+    /// <paramref name="name"/> (see <see cref="VisualBaseline"/>). Anything that legitimately
+    /// changes between runs - like today's date - must be made fixed before calling this.
+    /// </summary>
+    protected async Task ExpectPageToMatchBaselineAsync(string name)
+    {
+        byte[] png = await Page.ScreenshotAsync(new PageScreenshotOptions
+        {
+            FullPage = true,
+            Animations = ScreenshotAnimations.Disabled,
+            Caret = ScreenshotCaret.Hide,
+            Scale = ScreenshotScale.Css,
+        });
+        VisualBaseline.AssertMatches(name, png);
+    }
+
+    /// <summary>
     /// Navigates relative to the running server, then waits for network idle so the Blazor Server
     /// SignalR circuit has finished connecting before the caller starts interacting with the page
     /// - clicking too early silently no-ops because the circuit isn't wired up yet.
